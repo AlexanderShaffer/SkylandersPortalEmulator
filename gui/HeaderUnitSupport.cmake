@@ -14,43 +14,35 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-# CMake 4.2.3 does not support C++ header units. The functions below artificially provide header unit support. However,
-# they are only compatible with the Clang C++ compiler. If a header file is modified, its corresponding header unit will
-# automatically be recompiled. Finally, the first CMake build will generate the build files correctly, yet display an
-# error related to header units. This error is expected and should be ignored. Any subsequent builds should display no errors.
+# CMake 4.2.3 does not support C++ header units. The functions below artificially provide header unit support. However, they are only
+# compatible with the Clang C++ compiler. If a header file is modified, its corresponding header unit will be automatically recompiled.
 
-function(target_header_unit TARGET SCOPE HEADER_PATH)
+function(target_header_unit TARGET SCOPE HEADER_PATH COMPILE_OPTIONS)
     cmake_path(GET HEADER_PATH STEM HEADER_STEM)
     set(OUTPUT_PATH "${CMAKE_BINARY_DIR}/header_units/${HEADER_STEM}.pcm")
+    set(COMMAND clang++ -std=c++23 ${COMPILE_OPTIONS} -fmodule-header ${HEADER_PATH} -o ${OUTPUT_PATH})
+    set(COMMENT "Precompiled header unit from ${HEADER_PATH}")
 
-    set(ONE_VALUE_KEYWORDS INCLUDE_PATH)
-    cmake_parse_arguments(PARSE_ARGV 0 ARGS "" "${ONE_VALUE_KEYWORDS}" "")
+    if (NOT EXISTS "${OUTPUT_PATH}")
+        file(MAKE_DIRECTORY "${CMAKE_BINARY_DIR}/header_units")
+        execute_process(COMMAND ${COMMAND} COMMAND_ERROR_IS_FATAL ANY)
+        message(${COMMENT})
+    endif ()
 
-    if(ARGS_INCLUDE_PATH)
-        set(INCLUDE_FLAG -I ${ARGS_INCLUDE_PATH})
-    endif()
-
-    add_custom_command(
-        OUTPUT ${OUTPUT_PATH}
-        COMMAND clang++ -std=c++23 -fmodule-header ${HEADER_PATH} ${INCLUDE_FLAG} -o ${OUTPUT_PATH}
-        DEPENDS ${HEADER_PATH}
-        VERBATIM
-        COMMENT "Precompiled header unit from ${HEADER_PATH}"
-    )
-
+    add_custom_command(OUTPUT ${OUTPUT_PATH} COMMAND ${COMMAND} DEPENDS ${HEADER_PATH} VERBATIM COMMENT ${COMMENT})
     target_sources(${TARGET} ${SCOPE} ${OUTPUT_PATH})
     target_compile_options(${TARGET} ${SCOPE} -fmodule-file=${OUTPUT_PATH})
 endfunction()
 
 function(target_header_units TARGET SCOPE)
-    set(MULTI_VALUE_KEYWORDS ABSOLUTE_PATH INCLUDE_PATH RELATIVE_PATH)
-    cmake_parse_arguments(PARSE_ARGV 0 ARGS "" "" "${MULTI_VALUE_KEYWORDS}")
+    set(MULTI_VALUE_ARGS HEADER_PATH COMPILE_OPTIONS)
+    cmake_parse_arguments(ARGS "" "" "${MULTI_VALUE_ARGS}" ${ARGN})
 
-    foreach(ARG ${ARGS_ABSOLUTE_PATH})
-        target_header_unit(${TARGET} ${SCOPE} ${ARG})
-    endforeach()
+    foreach (HEADER_PATH COMPILE_OPTIONS IN ZIP_LISTS ARGS_HEADER_PATH ARGS_COMPILE_OPTIONS)
+        if (NOT HEADER_PATH OR NOT COMPILE_OPTIONS)
+            message(FATAL_ERROR "Each header unit in target_header_units() must include the header file path and compile options.")
+        endif ()
 
-    foreach(ARG IN ZIP_LISTS ARGS_INCLUDE_PATH ARGS_RELATIVE_PATH)
-        target_header_unit(${TARGET} ${SCOPE} "${ARG_0}/${ARG_1}" INCLUDE_PATH ${ARG_0})
-    endforeach()
+        target_header_unit("${TARGET}" "${SCOPE}" "${HEADER_PATH}" "${${COMPILE_OPTIONS}}")
+    endforeach ()
 endfunction()

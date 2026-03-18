@@ -18,8 +18,8 @@
 
 export module Figure;
 
-import <imgui/imgui.h>;
-import <imgui/imgui_internal.h>;
+import <imgui.h>;
+import <imgui_internal.h>;
 import std;
 import Texture;
 import PortalEmulator;

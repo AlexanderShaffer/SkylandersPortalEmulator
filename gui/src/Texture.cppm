@@ -18,26 +18,26 @@
 
 export module Texture;
 
-import <stb_image/stb_image.h>;
-import <glew/glew.h>;
-import <imgui/imgui.h>;
-import <imgui/imgui_internal.h>;
+import <stb_image.h>;
+import <backends/imgui_impl_opengl3_loader.h>;
+import <imgui.h>;
+import <imgui_internal.h>;
 import std;
 
-export class Texture final
+export class Texture
 {
 private:
 
-    class Image final
+    class ImageState
     {
     public:
 
-        explicit Image(stbi_uc* ptr) : m_ptr{ptr} {}
-        ~Image();
-        Image(const Image& other) = delete;
-        Image(Image&& other) noexcept;
-        Image& operator=(const Image& other) = delete;
-        Image& operator=(Image&& other) noexcept;
+        explicit ImageState(stbi_uc* ptr) : m_ptr{ptr} {}
+        ~ImageState();
+        ImageState(const ImageState& other) = delete;
+        ImageState(ImageState&& other) noexcept;
+        ImageState& operator=(const ImageState& other) = delete;
+        ImageState& operator=(ImageState&& other) noexcept;
 
         [[nodiscard]] stbi_uc* getPtr() const {return m_ptr;}
 
@@ -46,16 +46,16 @@ private:
         stbi_uc* m_ptr{};
     };
 
-    class Loaded final
+    class LoadedState
     {
     public:
 
-        Loaded(const Image& image, ImVec2 size);
-        ~Loaded();
-        Loaded(const Loaded& other) = delete;
-        Loaded(Loaded&& other) noexcept;
-        Loaded& operator=(const Loaded& other) = delete;
-        Loaded& operator=(Loaded&& other) noexcept;
+        LoadedState(const ImageState& image, ImVec2 size);
+        ~LoadedState();
+        LoadedState(const LoadedState& other) = delete;
+        LoadedState(LoadedState&& other) noexcept;
+        LoadedState& operator=(const LoadedState& other) = delete;
+        LoadedState& operator=(LoadedState&& other) noexcept;
 
         [[nodiscard]] GLuint getId() const {return m_id;}
 
@@ -85,6 +85,6 @@ private:
 
 private:
 
-    std::variant<std::monostate, Image, Loaded> m_state{};
+    std::variant<std::monostate, ImageState, LoadedState> m_state{};
     ImVec2 m_size{};
 };

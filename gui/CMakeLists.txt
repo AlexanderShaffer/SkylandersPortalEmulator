@@ -15,33 +15,57 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 cmake_minimum_required(VERSION 4.2.3)
-
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED YES)
-set(CMAKE_CXX_EXTENSIONS OFF)
+set(CMAKE_CXX_EXTENSIONS OFF) # Required to avoid a CMake error
 set(CMAKE_EXPERIMENTAL_CXX_IMPORT_STD d0edc3af-4c50-42ea-a356-e2862fe7a444)
 set(CMAKE_CXX_MODULE_STD ON)
 
 project(SkylandersPortalEmulator)
 
-set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/$<CONFIGURATION>")
-set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/$<CONFIGURATION>")
-add_subdirectory(dependencies/sdl3/ EXCLUDE_FROM_ALL)
+include(FetchContent)
 
-set(DEAR_IMGUI_PATH dependencies/imgui)
-
-add_library(DearImGui STATIC
-    ${DEAR_IMGUI_PATH}/imgui.cpp
-    ${DEAR_IMGUI_PATH}/imgui_draw.cpp
-    ${DEAR_IMGUI_PATH}/imgui_impl_opengl3.cpp
-    ${DEAR_IMGUI_PATH}/imgui_impl_sdl3.cpp
-    ${DEAR_IMGUI_PATH}/imgui_tables.cpp
-    ${DEAR_IMGUI_PATH}/imgui_widgets.cpp
+FetchContent_Declare(ImGui
+    GIT_REPOSITORY https://github.com/ocornut/imgui.git
+    GIT_TAG 6ded5230d043aa32c755e65c910c2af5002fb9f9 # Release 1.92.6
 )
 
-target_include_directories(DearImGui PRIVATE dependencies/sdl3/include/)
+FetchContent_Declare(Sdl
+    GIT_REPOSITORY https://github.com/libsdl-org/SDL.git
+    GIT_TAG 683181b47cfabd293e3ea409f838915b8297a4fd # Release 3.4.2
+)
 
-add_library(StbImage STATIC dependencies/stb_image/stb_image.cpp)
+FetchContent_Declare(Stb
+    GIT_REPOSITORY https://github.com/nothings/stb.git
+    GIT_TAG 013ac3beddff3dbffafd5177e7972067cd2b5083 # Release 2.30
+)
+
+FetchContent_MakeAvailable(ImGui Sdl Stb)
+set(IMGUI_PATH "${FETCHCONTENT_BASE_DIR}/imgui-src")
+set(SDL_PATH "${FETCHCONTENT_BASE_DIR}/sdl-src")
+set(STB_IMAGE_PATH "${FETCHCONTENT_BASE_DIR}/stb-src")
+
+add_library(ImGui STATIC
+    ${IMGUI_PATH}/imgui.cpp
+    ${IMGUI_PATH}/imgui_draw.cpp
+    ${IMGUI_PATH}/imgui_tables.cpp
+    ${IMGUI_PATH}/imgui_widgets.cpp
+    ${IMGUI_PATH}/backends/imgui_impl_opengl3.cpp
+    ${IMGUI_PATH}/backends/imgui_impl_sdl3.cpp
+)
+
+set(SDL_INCLUDE_OPTION "-I${SDL_PATH}/include")
+
+set(IMGUI_COMPILE_OPTIONS
+    "-I${IMGUI_PATH}"
+    ${SDL_INCLUDE_OPTION}
+    -DIMGUI_DEFINE_MATH_OPERATORS
+    -DIMGUI_DISABLE_DEMO_WINDOWS
+    -DIMGUI_DISABLE_DEBUG_TOOLS
+    -DIMGUI_DISABLE_DEFAULT_FONT
+)
+
+target_compile_options(ImGui PUBLIC ${IMGUI_COMPILE_OPTIONS})
 
 add_executable(SkylandersPortalEmulator WIN32)
 
@@ -64,22 +88,23 @@ target_sources(SkylandersPortalEmulator
     src/Texture.cppm
 )
 
+target_include_directories(SkylandersPortalEmulator PRIVATE ../common/ ${STB_IMAGE_PATH})
+target_link_libraries(SkylandersPortalEmulator PRIVATE ImGui SDL3::SDL3 ws2_32.lib)
 target_compile_options(SkylandersPortalEmulator PRIVATE -Wno-experimental-header-units)
-target_include_directories(SkylandersPortalEmulator PRIVATE dependencies/ ../common/ dependencies/sdl3/include/)
-target_link_libraries(SkylandersPortalEmulator PRIVATE SDL3::SDL3 DearImGui StbImage ws2_32.lib OpenGl32.lib -static)
 target_compile_definitions(SkylandersPortalEmulator PRIVATE PICO_IPV4_ADDRESS=${PICO_IPV4_ADDRESS})
 
+set(STB_IMAGE_COMPILE_OPTIONS -DSTB_IMAGE_IMPLEMENTATION -DSTB_IMAGE_STATIC)
 include(HeaderUnitSupport.cmake)
 
 target_header_units(SkylandersPortalEmulator PRIVATE
-    ABSOLUTE_PATH "${CMAKE_CURRENT_LIST_DIR}/../common/Common.hpp"
-    ABSOLUTE_PATH "${CMAKE_CURRENT_LIST_DIR}/dependencies/glew/glew.h"
-    ABSOLUTE_PATH "${CMAKE_CURRENT_LIST_DIR}/dependencies/imgui/imgui.h"
-    ABSOLUTE_PATH "${CMAKE_CURRENT_LIST_DIR}/dependencies/imgui/imgui_impl_opengl3.h"
-    ABSOLUTE_PATH "${CMAKE_CURRENT_LIST_DIR}/dependencies/imgui/imgui_impl_sdl3.h"
-    ABSOLUTE_PATH "${CMAKE_CURRENT_LIST_DIR}/dependencies/imgui/imgui_internal.h"
-    INCLUDE_PATH "${CMAKE_CURRENT_LIST_DIR}/dependencies/sdl3/include" RELATIVE_PATH SDL3/SDL.h
-    ABSOLUTE_PATH "${CMAKE_CURRENT_LIST_DIR}/dependencies/stb_image/stb_image.h"
-    ABSOLUTE_PATH "${WINSOCK_HEADER_PATH}/winsock2.h"
-    ABSOLUTE_PATH "${WINSOCK_HEADER_PATH}/ws2tcpip.h"
+    HEADER_PATH "${IMGUI_PATH}/backends/imgui_impl_opengl3.h" COMPILE_OPTIONS IMGUI_COMPILE_OPTIONS
+    HEADER_PATH "${IMGUI_PATH}/backends/imgui_impl_opengl3_loader.h" COMPILE_OPTIONS IMGUI_COMPILE_OPTIONS
+    HEADER_PATH "${IMGUI_PATH}/backends/imgui_impl_sdl3.h" COMPILE_OPTIONS IMGUI_COMPILE_OPTIONS
+    HEADER_PATH "${IMGUI_PATH}/imgui_internal.h" COMPILE_OPTIONS IMGUI_COMPILE_OPTIONS
+    HEADER_PATH "${IMGUI_PATH}/imgui.h" COMPILE_OPTIONS IMGUI_COMPILE_OPTIONS
+    HEADER_PATH "${SDL_PATH}/include/SDL3/SDL.h" COMPILE_OPTIONS SDL_INCLUDE_OPTION
+    HEADER_PATH "${CMAKE_CURRENT_LIST_DIR}/../common/Common.hpp" COMPILE_OPTIONS NONE
+    HEADER_PATH "${STB_IMAGE_PATH}/stb_image.h" COMPILE_OPTIONS STB_IMAGE_COMPILE_OPTIONS
+    HEADER_PATH "${WINSOCK_HEADER_PATH}/winsock2.h" COMPILE_OPTIONS NONE
+    HEADER_PATH "${WINSOCK_HEADER_PATH}/ws2tcpip.h" COMPILE_OPTIONS NONE
 )

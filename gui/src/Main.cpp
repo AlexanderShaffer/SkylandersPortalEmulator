@@ -17,9 +17,9 @@
  */
 
 import <SDL3/SDL.h>;
-import <glew/glew.h>;
-import <imgui/imgui_impl_sdl3.h>;
-import <imgui/imgui_impl_opengl3.h>;
+import <backends/imgui_impl_opengl3_loader.h>;
+import <backends/imgui_impl_sdl3.h>;
+import <backends/imgui_impl_opengl3.h>;
 import Owner;
 import FigureLoader;
 

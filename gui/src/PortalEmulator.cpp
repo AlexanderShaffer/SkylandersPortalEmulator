@@ -269,7 +269,7 @@ void PortalEmulator::respond(const std::span<uint8_t> packet)
                 portalSlot->setState(PortalSlotState::LOADING);
                 m_sendRequests.emplace_back(std::bind_front(&PortalEmulator::requestPlayableLoad, this, std::cref(portalSlot)));
             }
-            else if(serverState == PortalSlotState::UNLOADING && !clientLoaded)
+            else if (serverState == PortalSlotState::UNLOADING && !clientLoaded)
                 portalSlot->setState(PortalSlotState::UNLOADED);
         }
     }

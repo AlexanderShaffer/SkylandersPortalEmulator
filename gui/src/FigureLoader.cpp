@@ -18,7 +18,7 @@
 
 module FigureLoader;
 
-import <imgui/imgui_internal.h>;
+import <imgui_internal.h>;
 
 void FigureLoader::renderSkylanderButtons()
 {

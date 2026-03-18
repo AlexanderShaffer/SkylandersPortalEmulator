@@ -18,19 +18,19 @@
 
 module Texture;
 
-import <glew/glew.h>;
+import <backends/imgui_impl_opengl3_loader.h>;
 
-Texture::Image::~Image()
+Texture::ImageState::~ImageState()
 {
     stbi_image_free(m_ptr);
 }
 
-Texture::Image::Image(Image&& other) noexcept
+Texture::ImageState::ImageState(ImageState&& other) noexcept
 {
     *this = std::move(other);
 }
 
-auto Texture::Image::operator=(Image&& other) noexcept -> Image&
+auto Texture::ImageState::operator=(ImageState&& other) noexcept -> ImageState&
 {
     if (this == &other)
         return *this;
@@ -41,27 +41,27 @@ auto Texture::Image::operator=(Image&& other) noexcept -> Image&
     return *this;
 }
 
-Texture::Loaded::Loaded(const Image& image, const ImVec2 size)
+Texture::LoadedState::LoadedState(const ImageState& image, const ImVec2 size)
 {
     glGenTextures(1, &m_id);
     glBindTexture(GL_TEXTURE_2D, m_id);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, size.x, size.y, 0, GL_RGBA, GL_UNSIGNED_BYTE, image.getPtr());
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, size.x, size.y, 0, GL_RGBA, GL_UNSIGNED_BYTE, image.getPtr());
     glBindTexture(GL_TEXTURE_2D, NO_TEXTURE);
 }
 
-Texture::Loaded::~Loaded()
+Texture::LoadedState::~LoadedState()
 {
     glDeleteTextures(1, &m_id);
 }
 
-Texture::Loaded::Loaded(Loaded&& other) noexcept
+Texture::LoadedState::LoadedState(LoadedState&& other) noexcept
 {
     *this = std::move(other);
 }
 
-auto Texture::Loaded::operator=(Loaded&& other) noexcept -> Loaded&
+auto Texture::LoadedState::operator=(LoadedState&& other) noexcept -> LoadedState&
 {
     if (this == &other)
         return *this;
@@ -80,7 +80,7 @@ Texture::Texture(const std::filesystem::path& imagePath)
     if (!image)
         throw std::runtime_error{"Failed to read an image from a file"};
 
-    m_state.emplace<Image>(image);
+    m_state.emplace<ImageState>(image);
     m_size = {static_cast<float>(width), static_cast<float>(height)};
 }
 
@@ -92,12 +92,12 @@ void Texture::render(ImDrawList* const drawList, const ImRect imageBounds, const
     if (!isLoaded())
         load();
 
-    drawList->AddImage(std::get<Loaded>(m_state).getId(), imageBounds.Min, imageBounds.Max, UV_MIN, UV_MAX, color);
+    drawList->AddImage(std::get<LoadedState>(m_state).getId(), imageBounds.Min, imageBounds.Max, UV_MIN, UV_MAX, color);
 }
 
 bool Texture::isLoaded() const
 {
-    return std::holds_alternative<Loaded>(m_state);
+    return std::holds_alternative<LoadedState>(m_state);
 }
 
 [[nodiscard]] ImVec2 Texture::getSize() const
@@ -107,6 +107,6 @@ bool Texture::isLoaded() const
 
 void Texture::load()
 {
-    auto image{std::get<Image>(std::move(m_state))};
-    m_state.emplace<Loaded>(image, m_size);
+    auto image{std::get<ImageState>(std::move(m_state))};
+    m_state.emplace<LoadedState>(image, m_size);
 }

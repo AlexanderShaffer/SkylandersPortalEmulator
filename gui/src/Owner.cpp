@@ -19,9 +19,9 @@
 module Owner;
 
 import <SDL3/SDL.h>;
-import <imgui/imgui.h>;
-import <imgui/imgui_impl_sdl3.h>;
-import <imgui/imgui_impl_opengl3.h>;
+import <imgui.h>;
+import <backends/imgui_impl_sdl3.h>;
+import <backends/imgui_impl_opengl3.h>;
 import Font;
 
 SdlOwner::SdlOwner()
