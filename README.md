@@ -147,7 +147,6 @@ ___
 - Convert the implementation of the PortalEmulator and FigureLoader classes into modules. Resources used by these classes will be managed by RAII objects.
 - Use object-oriented programing to improve the readability of the PortalEmulator implementation and Pico source code.
 - Replace poor practice _std::println_ error logging with C++ exceptions.
-- Join the threads started by the PortalEmulator and FigureLoader objects after the GUI window has finished closing. Currently, the window freezes for about one second before closing because the threads are joined too early.
 - Split the Pico source code into multiple modules and eliminate all global variables with external linkage.
 - Add a section within the GUI that allows users to add and remove figures. A comprehensive list of all figures would be distributed with the GUI binary, removing the need for users to source _.dump_ and _.jpg_ files themselves.
 - Use _libusb_ to allow users to extract _.dump_ files from their physical figures through the NFC readers in the original portals. This feature will make it easier for users to transition from physical to digital figures.

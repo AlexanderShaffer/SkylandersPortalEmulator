@@ -68,6 +68,10 @@ void FigureLoader::renderSkylanderButtons()
 
 void FigureLoader::run(const std::stop_token& token)
 {
+    std::condition_variable_any threadStopCondition{};
+    std::mutex mutex{};
+    std::unique_lock lock{mutex};
+
     while (!token.stop_requested())
     {
         const auto[playablesFound, groupsFound]{searchForFigures()};
@@ -75,7 +79,7 @@ void FigureLoader::run(const std::stop_token& token)
         m_tick = !m_tick;
 
         constexpr auto SEARCH_TIME_INTERVAL{std::chrono::milliseconds(1000)};
-        std::this_thread::sleep_for(SEARCH_TIME_INTERVAL);
+        threadStopCondition.wait_for(lock, token, SEARCH_TIME_INTERVAL, []{return false;});
     }
 }
 
