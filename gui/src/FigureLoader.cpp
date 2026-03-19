@@ -66,17 +66,6 @@ void FigureLoader::renderSkylanderButtons()
             figure->render(drawList, disableSwapperBottoms, disableSwapperTops, connected);
 }
 
-int FigureLoader::searchFor(const std::filesystem::path& directory, const std::function<int(const std::filesystem::path&, const std::filesystem::path&)>& searchForPlayables)
-{
-    if (!std::filesystem::exists(directory))
-        return 0;
-
-    const auto dumpsDirectory = directory / "Dumps";
-    const auto iconsDirectory = directory / "Icons";
-
-    return std::filesystem::is_directory(dumpsDirectory) && std::filesystem::is_directory(iconsDirectory) ? searchForPlayables(dumpsDirectory, iconsDirectory) : 0;
-}
-
 void FigureLoader::run(const std::stop_token& token)
 {
     while (!token.stop_requested())
@@ -88,6 +77,38 @@ void FigureLoader::run(const std::stop_token& token)
         constexpr auto SEARCH_TIME_INTERVAL{std::chrono::milliseconds(1000)};
         std::this_thread::sleep_for(SEARCH_TIME_INTERVAL);
     }
+}
+
+int FigureLoader::searchForPlayables(const std::filesystem::path& directory, FigureList& figures, const SwapperHalf swapperHalf)
+{
+    const auto dumpsDirectory{directory / "Dumps"};
+    const auto iconsDirectory{directory / "Icons"};
+    int figuresFound{};
+
+    if (!std::filesystem::is_directory(dumpsDirectory) || !std::filesystem::is_directory(iconsDirectory))
+        return figuresFound;
+
+    for (const auto& dump : std::filesystem::directory_iterator{dumpsDirectory})
+    {
+        const auto& dumpPath{dump.path()};
+        constexpr std::string_view DUMP_EXTENSION{".dump"};
+
+        if (dumpPath.extension() != DUMP_EXTENSION)
+            continue;
+
+        const auto dumpName{dumpPath.filename().string()};
+        const std::string_view name{dumpName.begin(), dumpName.end() - DUMP_EXTENSION.size()};
+        constexpr auto IMAGE_EXTENSION{".jpg"};
+        const auto iconPath{iconsDirectory / name += IMAGE_EXTENSION};
+
+        if (!std::filesystem::exists(iconPath))
+            continue;
+
+        loadPlayable(figures, swapperHalf, dumpPath, iconPath, name);
+        figuresFound++;
+    }
+
+    return figuresFound;
 }
 
 std::pair<int, int> FigureLoader::searchForFigures()
@@ -120,44 +141,12 @@ std::pair<int, int> FigureLoader::searchForFigures()
         groupsFound++;
         tickWhenFound = m_tick;
 
-        const auto searchForSkylanders{std::bind_front(&FigureLoader::searchForPlayables, this, std::ref(figures), SwapperHalf::NONE)};
-        playablesFound += searchFor(groupDirectory, searchForSkylanders);
-
-        const auto searchForBottomHalves{std::bind_front(&FigureLoader::searchForPlayables, this, std::ref(figures), SwapperHalf::BOTTOM)};
-        playablesFound += searchFor(groupDirectory / "Bottom Halves", searchForBottomHalves);
-
-        const auto searchForTopHalves{std::bind_front(&FigureLoader::searchForPlayables, this, std::ref(figures), SwapperHalf::TOP)};
-        playablesFound += searchFor(groupDirectory / "Top Halves", searchForTopHalves);
+        playablesFound += searchForPlayables(groupDirectory, figures, SwapperHalf::NONE);
+        playablesFound += searchForPlayables(groupDirectory / "Bottom Halves", figures, SwapperHalf::BOTTOM);
+        playablesFound += searchForPlayables(groupDirectory / "Top Halves", figures, SwapperHalf::TOP);
     }
 
     return {playablesFound, groupsFound};
-}
-
-[[nodiscard]] int FigureLoader::searchForPlayables(FigureList& figures, const SwapperHalf swapperHalf, const std::filesystem::path& dumpsDirectory, const std::filesystem::path& iconsDirectory)
-{
-    int figuresFound{};
-
-    for (const auto& dump : std::filesystem::directory_iterator{dumpsDirectory})
-    {
-        const auto& dumpPath{dump.path()};
-        constexpr std::string_view DUMP_EXTENSION{".dump"};
-
-        if (dumpPath.extension() != DUMP_EXTENSION)
-            continue;
-
-        const auto dumpName{dumpPath.filename().string()};
-        const std::string_view name{dumpName.begin(), dumpName.end() - DUMP_EXTENSION.size()};
-        constexpr auto IMAGE_EXTENSION{".jpg"};
-        const auto iconPath{iconsDirectory / name += IMAGE_EXTENSION};
-
-        if (!std::filesystem::exists(iconPath))
-            continue;
-
-        loadPlayable(figures, swapperHalf, dumpPath, iconPath, name);
-        figuresFound++;
-    }
-
-    return figuresFound;
 }
 
 void FigureLoader::loadPlayable(FigureList& figures, const SwapperHalf swapperHalf, const std::filesystem::path& dumpPath, const std::filesystem::path& iconPath, const std::string_view name)

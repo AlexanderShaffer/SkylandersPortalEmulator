@@ -85,8 +85,8 @@ ___
 ## GUI Dependencies
 
 - **Dear ImGui:** GUI library used to display the figure buttons in a grid with appropriate padding.
-- **GLEW and OpenGL:** Backends for Dear ImGui, and used by this project to load figure images into GPU memory.
-- **SDL3:** Backend for Dear ImGui, and used by this project to play audio sent by the Pico.
+- **SDL3:** Backend for Dear ImGui, and used by this project to manage the application window and play audio sent by the Pico.
+- **OpenGL:** Backend for Dear ImGui, and used by this project to load figure images into GPU memory.
 - **stb_image:** Used to load figure images from secondary storage to main memory.
 - **Winsock2:** Windows networking API used to allow the GUI to communicate with the Pico.
 
@@ -126,21 +126,20 @@ Audio data sent by the console to the Pico is relayed at a variable rate to the 
 
 ## Pico Threads
 
-The Pico has four threads:
+The FreeRTOS operating system executing on the Pico manages four threads:
 
-- The LWIP main thread initialized by the LWIP library.
-- A USB thread for communicating with the console, sending audio data to the GUI, and periodically pinging the GUI.
-- A TCP sender/receiver thread for receiving and sending figure data to the GUI.
-- A UDP receiver thread for receiving audio stream size notifications from the GUI.
+1. The LWIP main thread initialized by the LWIP library.
+2. A USB thread for communicating with the console, sending audio data to the GUI, and periodically pinging the GUI.
+3. A TCP sender/receiver thread for receiving and sending figure data to the GUI.
+4. A UDP receiver thread for receiving audio stream size notifications from the GUI.
 
-These threads are managed by the FreeRTOS operating system. Also, the USB thread runs on a separate core from the other three threads. This decision was made because the USB thread has the greatest workload. This thread is constantly polling for USB packets sent by the console and must send UDP packets to the GUI. On the other hand, the other three threads are required to communicate with the GUI only, and communication with the GUI happens less often compared to the console.
+The USB thread runs on a separate core from the other three threads. This decision was made because the USB thread has the greatest workload. This thread is constantly polling for USB packets sent by the console and must send UDP packets to the GUI. On the other hand, the other three threads are required to communicate with the GUI only, and communication with the GUI happens less often compared to the console.
 
 ___
 
 # Planned Improvements and Features
 
 - Distribute precompiled binaries for the GUI and Pico that do not require manual configuration.
-- Configure CMake to automatically fetch external dependencies from GitHub.
 - Add sufficient build instructions for the GUI and Pico source code that include the toolchains required.
 - Switch the type of communication between the GUI and Pico from internet to Bluetooth. Then, the Pico would require line of sight with the computer running the GUI rather than the internet modem.
 - Complete _TODO_ comments within the source code.

@@ -42,11 +42,9 @@ public:
 
 private:
 
-    [[nodiscard]] static int searchFor(const std::filesystem::path& directory, const std::function<int(const std::filesystem::path&, const std::filesystem::path&)>& searchForPlayables);
-
     void run(const std::stop_token& token);
+    [[nodiscard]] int searchForPlayables(const std::filesystem::path& directory, FigureList& figures, SwapperHalf swapperHalf);
     [[nodiscard]] std::pair<int, int> searchForFigures();
-    [[nodiscard]] int searchForPlayables(FigureList& figures, SwapperHalf swapperHalf, const std::filesystem::path& dumpsDirectory, const std::filesystem::path& iconsDirectory);
     void loadPlayable(FigureList& figures, SwapperHalf swapperHalf, const std::filesystem::path& dumpPath, const std::filesystem::path& iconPath, std::string_view name);
     void removeLostFigures(int playablesFound, int groupsFound);
 
