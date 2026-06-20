@@ -44,7 +44,33 @@ ___
 
 ## Initial Setup
 
-Currently, the GUI and Pico source code must be recompiled for each Wi-Fi network. For the GUI, the _PICO_IPV4_ADDRESS_ CMake cache variable must be defined. For the Pico, the _WIFI_SSID_, _WIFI_PASSWORD_, and _HOST_IPV4_ADDRESS_ CMake cache variables must be defined.
+**To get it to work, you need:**
+
+- Raspberry Pi Pico W
+- USB-A to micro-B cable
+- Windows Laptop or Desktop PC
+- Any Skylanders game except the Xbox 360, Xbox One, and Nintendo Switch versions
+
+There are many vendors that sell a Raspberry Pi Pico W and USB-A to micro-B cable. Here is an [Amazon link](https://www.amazon.com/waveshare-Pre-Soldered-Pi-Pico-Microcontroller/dp/B0BN14J26Q/ref=sr_1_4?crid=1IBWGK9V29QD9&dib=eyJ2IjoiMSJ9.5oW7RCSkz_TPdetw_cDOwjHdMoCJFxQk227MAQcL_7O8PDp795mmREnLL4o-MVsSvq5W2IMMVleSKTrPZZaGYdOYpNz7bHb4SW946BZON-B_oi9gnRAx5gLG7M4ArfDSi8mRRXQufSTHEbWmcl4Mx2AQIsmz_H_rRrHELIw0-Pg-ZWlxzjfnEcpqH4EHbqjaVL97JiVxAoN-tNH0Zh15Z0ESzFvMG4ZL4_WjmrS4sRzhe0_qszG71aWzZLVQ3WjHv8orhNQ9M7QyRYREjQLRSDSRLuXgTb8CpvBKOGi9ziE.2JLzDWAg5d1oanhGYjsr5lQBoE7j8oasw6xGiBBG454&dib_tag=se&keywords=Raspberry+Pi+Pico+W&qid=1781912411&s=electronics&sprefix=raspberry+pi+pico+%2Celectronics%2C290&sr=1-4) that includes both in one product.
+
+**Follow these steps on your Windows device:**
+
+**Required instructions:**
+
+1. Go to this [Google Drive](https://drive.google.com/file/d/1R5ZLKUpqUtZFHQ2FT9N2Wy6pIhcyjooc/view?usp=sharing) link, click on the blue download button, and extract the _.zip_ file that was downloaded. After extracting, you may delete the _.zip_ file, but keep the _SkylandersPortalEmulatorSetup_ directory that was extracted.
+2. Double-click on _setup.bat_ in the _SkylandersPortalEmulatorSetup_ directory.
+3. Follow the instructions in _setup.bat_, but skip the part where it asks for the IPv4 address of the Raspberry Pi Pico W (see steps 4-9).
+
+**Optional instructions for enabling portal audio when playing Trap Team:**
+
+4. Make sure you have completed the instructions in _setup.bat_ and dragged _SkylandersPortalEmulator.uf2_ into the Raspberry Pi Pico W before continuing.
+5. Plug the Raspberry Pi Pico W anywhere (i.e. your Windows device or game console).
+6. Open your browser and enter _192.168.1.1_ into the search bar.
+7. Enter the username and password for your Wi-Fi router.
+8. Find the IPv4 address of the Raspberry Pi Pico W. You may need to Google how to do this for your specific router. For me, it is under the Attached Devices tab. The name of the Raspberry Pi Pico W according to the router will be PICOW.
+9. Double-click on _setup.bat_ again, follow the instructions, and enter the IPv4 address of the Raspberry Pi Pico W when instructed.
+
+I am working on making this project cross-platform and the process of setting it up much easier by using Bluetooth instead of Wi-Fi.
 
 ## Configuring the GUI 
 
@@ -76,7 +102,7 @@ Pressing the middle mouse button removes all figures from the game and red tints
 
 ## Demonstration Video
 
-[This YouTube video](https://www.youtube.com/watch?v=lvt3XxA4824) demonstrates how to use the portal emulator after the initial setup. In other words, it is a summary of the previous two subsections. The video begins by showing how to configure the GUI. Then, the video summarizes how the emulator functions while playing the game. All six PS3 versions of the games and all six figure types are showcased. Finally, the video ends by proving that skylander upgrades purchased and gold coins remaining are retained even after restarting the GUI.
+[This YouTube video](https://www.youtube.com/watch?v=lvt3XxA4824) demonstrates how to use the portal emulator after the initial setup. The video begins by showing how to configure the GUI. Then, the video summarizes how the emulator functions while playing the game. All six PS3 versions of the games and all six figure types are showcased. Finally, the video ends by proving that skylander upgrades purchased and gold coins remaining are retained even after restarting the GUI.
 
 ___
 
