@@ -14,23 +14,19 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-# CMake 4.2.3 does not support C++ header units. The functions below artificially provide header unit support. However, they are only
-# compatible with the Clang C++ compiler. If a header file is modified, its corresponding header unit will be automatically recompiled.
+# CMake 4.4.3 does not support C++ header units. The functions below artificially provide header unit support.
+# However, they are only compatible with the Clang C++ compiler. CMake must be reloaded after changes are made
+# to any header files that are compiled into header units.
 
 function(target_header_unit TARGET SCOPE HEADER_PATH COMPILE_OPTIONS)
+    file(MAKE_DIRECTORY "${CMAKE_BINARY_DIR}/header_units")
+
     cmake_path(GET HEADER_PATH STEM HEADER_STEM)
     set(OUTPUT_PATH "${CMAKE_BINARY_DIR}/header_units/${HEADER_STEM}.pcm")
-    set(COMMAND clang++ -std=c++23 ${COMPILE_OPTIONS} -fmodule-header ${HEADER_PATH} -o ${OUTPUT_PATH})
-    set(COMMENT "Precompiled header unit from ${HEADER_PATH}")
 
-    if (NOT EXISTS "${OUTPUT_PATH}")
-        file(MAKE_DIRECTORY "${CMAKE_BINARY_DIR}/header_units")
-        execute_process(COMMAND ${COMMAND} COMMAND_ERROR_IS_FATAL ANY)
-        message(${COMMENT})
-    endif ()
+    execute_process(COMMAND clang++ -std=c++23 ${COMPILE_OPTIONS} -fmodule-header ${HEADER_PATH} -o ${OUTPUT_PATH} COMMAND_ERROR_IS_FATAL ANY)
+    message("Precompiled header unit from ${HEADER_PATH}")
 
-    add_custom_command(OUTPUT ${OUTPUT_PATH} COMMAND ${COMMAND} DEPENDS ${HEADER_PATH} VERBATIM COMMENT ${COMMENT})
-    target_sources(${TARGET} ${SCOPE} ${OUTPUT_PATH})
     target_compile_options(${TARGET} ${SCOPE} -fmodule-file=${OUTPUT_PATH})
 endfunction()
 

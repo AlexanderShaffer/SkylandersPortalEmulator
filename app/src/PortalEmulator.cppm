@@ -20,7 +20,7 @@ export module PortalEmulator;
 
 import "Common.hpp";
 import <SDL3/SDL.h>;
-import <winsock2.h>;
+//import <winsock2.h>;
 import std;
 import PortalSlot;
 import Owner;
@@ -68,9 +68,9 @@ private:
     bool m_receivedTcpMessage{};
     std::deque<std::function<bool()>> m_sendRequests{};
     bool m_connected{};
-    SOCKET m_tcpClient{INVALID_SOCKET};
-    SOCKET m_udpClient{INVALID_SOCKET};
-    sockaddr m_clientAddress{};
+    //SOCKET m_tcpClient{INVALID_SOCKET};
+    //SOCKET m_udpClient{INVALID_SOCKET};
+    //sockaddr m_clientAddress{};
 
     //TODO: Consider when multiple Raspberry Pis can connect to the same computer
     std::jthread m_networkThread{std::bind_front(&PortalEmulator::runNetworkThread, this)};

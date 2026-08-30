@@ -19,11 +19,11 @@
 module PortalEmulator;
 
 import <SDL3/SDL.h>;
-import <ws2tcpip.h>;
+//import <ws2tcpip.h>;
 
 PortalEmulator::~PortalEmulator()
 {
-    WSACleanup();
+    //WSACleanup();
 }
 
 [[nodiscard]] std::shared_ptr<PortalSlot> PortalEmulator::linkPortalSlot(const std::filesystem::path& figureDumpPath)
@@ -63,6 +63,7 @@ bool PortalEmulator::requestUnload(const std::shared_ptr<PortalSlot>& portalSlot
 
 bool PortalEmulator::connectToTcpClient()
 {
+    /*
     addrinfo hints{};
     hints.ai_family = AF_INET;
     hints.ai_socktype = SOCK_STREAM;
@@ -111,6 +112,8 @@ bool PortalEmulator::connectToTcpClient()
     std::println("TCP connection established");
     closesocket(listenSocket);
     return true;
+    */
+    return false;
 }
 
 bool PortalEmulator::validatePortalSlots() const
@@ -126,10 +129,10 @@ bool PortalEmulator::validatePortalSlots() const
 
 void PortalEmulator::runNetworkThread(const std::stop_token& token)
 {
-    WSADATA wsaData{};
+    //WSADATA wsaData{};
 
-    if (WSAStartup(WINSOCK_VERSION, &wsaData))
-        throw std::runtime_error("WSAStartup failed");
+    //if (WSAStartup(WINSOCK_VERSION, &wsaData))
+        //throw std::runtime_error("WSAStartup failed");
 
     while (!token.stop_requested())
     {
@@ -157,10 +160,10 @@ void PortalEmulator::runNetworkThread(const std::stop_token& token)
         tcpSender.request_stop();
         tcpReceiver.request_stop();
 
-        shutdown(m_udpClient, SD_BOTH);
-        closesocket(m_udpClient);
-        shutdown(m_tcpClient, SD_BOTH);
-        closesocket(m_tcpClient);
+        //shutdown(m_udpClient, SD_BOTH);
+        //closesocket(m_udpClient);
+        //shutdown(m_tcpClient, SD_BOTH);
+        //closesocket(m_tcpClient);
         m_receiveCondition.notify_all();
         m_sendCondition.notify_all();
     }
@@ -232,24 +235,26 @@ bool PortalEmulator::tcpSend(const std::span<uint8_t> packet) const
     packet[0] = packet.size() >> 8;
     packet[1] = packet.size();
 
-    if (send(m_tcpClient, reinterpret_cast<const char*>(packet.data()), packet.size(), 0) != packet.size())
-    {
-        std::println("Failed to send data: {}", WSAGetLastError());
-        return false;
-    }
+    //if (send(m_tcpClient, reinterpret_cast<const char*>(packet.data()), packet.size(), 0) != packet.size())
+    //{
+        //std::println("Failed to send data: {}", WSAGetLastError());
+        //return false;
+    //}
 
-    return true;
+    //return true;
+    return false;
 }
 
 [[nodiscard]] bool PortalEmulator::tcpReceive(const std::span<uint8_t> buffer) const
 {
-    const int bytesReceived{recv(m_tcpClient, reinterpret_cast<char*>(buffer.data()), buffer.size(), MSG_WAITALL)};
-    const bool success{bytesReceived == buffer.size()};
+    //const int bytesReceived{recv(m_tcpClient, reinterpret_cast<char*>(buffer.data()), buffer.size(), MSG_WAITALL)};
+    //const bool success{bytesReceived == buffer.size()};
 
-    if (!success)
-        std::println("TCP receive failed with code: {}", WSAGetLastError());
+    //if (!success)
+        //std::println("TCP receive failed with code: {}", WSAGetLastError());
 
-    return success;
+    //return success;
+    return false;
 }
 
 void PortalEmulator::respond(const std::span<uint8_t> packet)
@@ -344,6 +349,7 @@ void PortalEmulator::runTcpSender(const std::stop_token& token)
 
 void PortalEmulator::runUdpReceiver(const std::stop_token& token)
 {
+    /*
     constexpr SDL_AudioSpec spec{.format = SDL_AUDIO_S16LE, .channels = 1, .freq = 8000};
 
     SDL_AudioStream* audioStream{SDL_OpenAudioDeviceStream(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, &spec, nullptr, nullptr)};
@@ -427,4 +433,5 @@ void PortalEmulator::runUdpReceiver(const std::stop_token& token)
     std::println("UDP receiver has terminated");
     m_connected = false;
     m_disconnectionCondition.notify_all();
+    */
 }
