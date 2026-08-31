@@ -23,11 +23,11 @@ import <imgui_internal.h>;
 void FigureLoader::renderSkylanderButtons()
 {
     constexpr int SKYLANDERS_PER_ROW{6};
-    constexpr ImVec2 PADDING{10.0f, 10.0f}; //TODO: Support accurate scaling for other resolutions and window sizes
+    const ImVec2 padding{ImGui::GetStyle().ItemSpacing * 2.0f};
     const ImGuiWindow* const window{ImGui::GetCurrentWindow()};
     const auto itemSpacingX{ImGui::GetStyle().ItemSpacing.x};
     const float totalWidth{(window->Size.x - itemSpacingX) / SKYLANDERS_PER_ROW};
-    const float imageWidth{totalWidth - itemSpacingX - PADDING.x * 2.0f};
+    const float imageWidth{totalWidth - itemSpacingX - padding.x * 2.0f};
     int column{};
     int swapperBottomsOnPortal{};
     int swapperTopsOnPortal{};
@@ -47,7 +47,7 @@ void FigureLoader::renderSkylanderButtons()
 
         for (const auto& figure : group.Figures.values())
         {
-            figure->update(index, pos, imageWidth, swapperBottomsOnPortal, swapperTopsOnPortal, PADDING, m_portalEmulator);
+            figure->update(index, pos, imageWidth, swapperBottomsOnPortal, swapperTopsOnPortal, padding, m_portalEmulator);
 
             if (column++ % SKYLANDERS_PER_ROW != SKYLANDERS_PER_ROW - 1)
                 ImGui::SameLine();

@@ -28,6 +28,7 @@ int main()
     const SdlOwner sdlOwner{};
     auto* const window{sdlOwner.getWindow()};
     const ImGuiOwner imGuiOwner{sdlOwner};
+    const ImVec2 maxItemSpacing{ImGui::GetStyle().ItemSpacing};
     const auto& io{ImGui::GetIO()};
     bool running{true};
     bool fullscreen{true};
@@ -69,6 +70,11 @@ int main()
 
         if (ImGui::Button(fullscreen ? "Fullscreen (F11): Enabled" : "Fullscreen (F11): Disabled"))
             SDL_SetWindowFullscreen(window, fullscreen = !fullscreen);
+
+        SDL_Rect displayBounds;
+        SDL_GetDisplayBounds(SDL_GetDisplayForWindow(window), &displayBounds);
+        ImGui::GetStyle().ItemSpacing = maxItemSpacing * (io.DisplaySize.x / displayBounds.w);
+        ImGui::GetStyle().WindowPadding = ImGui::GetStyle().ItemSpacing;
 
         figureLoader.renderSkylanderButtons();
         ImGui::End();

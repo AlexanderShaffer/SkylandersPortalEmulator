@@ -86,8 +86,8 @@ ImGuiOwner::ImGuiOwner(const SdlOwner& sdlOwner)
     style.Colors[ImGuiCol_Separator] = {1.0f, 0.5f, 0.0f, 1.0f};
     style.SeparatorTextBorderSize = 10.0f;
     style.SeparatorTextPadding.y = 15.0f;
-    style.ItemSpacing = {6.0f, 6.0f};
-    style.WindowPadding = {6.0f, 6.0f};
+    style.ItemSpacing = {5.0f, 5.0f};
+    style.WindowPadding = style.ItemSpacing;
     style.ScaleAllSizes(sdlOwner.getScale());
     style.FontScaleDpi = sdlOwner.getScale();
 }
