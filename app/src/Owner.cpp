@@ -75,7 +75,7 @@ ImGuiOwner::ImGuiOwner(const SdlOwner& sdlOwner)
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
     io.WantSaveIniSettings = false;
     io.IniFilename = nullptr;
-    io.Fonts->AddFontFromMemoryCompressedTTF(FONT_COMPRESSED_DATA, sizeof(FONT_COMPRESSED_DATA), 60.0f);
+    io.Fonts->AddFontFromMemoryCompressedTTF(FONT_COMPRESSED_DATA, sizeof(FONT_COMPRESSED_DATA), 50.0f);
 
     ImGui::StyleColorsDark();
     auto& style{ImGui::GetStyle()};

@@ -30,6 +30,7 @@ int main()
     const ImGuiOwner imGuiOwner{sdlOwner};
     const auto& io{ImGui::GetIO()};
     bool running{true};
+    bool fullscreen{true};
     FigureLoader figureLoader{};
 
     while (running)
@@ -40,6 +41,8 @@ int main()
         {
             if (event.type == SDL_EVENT_MOUSE_WHEEL)
                 event.wheel.y *= 0.3f;
+            else if (event.type == SDL_EVENT_KEY_DOWN && event.key.key == SDLK_F11)
+                SDL_SetWindowFullscreen(window, fullscreen = !fullscreen);
 
             ImGui_ImplSDL3_ProcessEvent(&event);
             running = event.type != SDL_EVENT_QUIT && event.type != SDL_EVENT_WINDOW_CLOSE_REQUESTED;
@@ -58,6 +61,15 @@ int main()
         ImGui::SetNextWindowPos({0.0f, 0.0f});
         ImGui::SetNextWindowSize({io.DisplaySize.x, io.DisplaySize.y});
         ImGui::Begin("Main Window", nullptr, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoScrollbar);
+
+        if (ImGui::Button("Exit"))
+            break;
+
+        ImGui::SameLine();
+
+        if (ImGui::Button(fullscreen ? "Fullscreen (F11): Enabled" : "Fullscreen (F11): Disabled"))
+            SDL_SetWindowFullscreen(window, fullscreen = !fullscreen);
+
         figureLoader.renderSkylanderButtons();
         ImGui::End();
 
