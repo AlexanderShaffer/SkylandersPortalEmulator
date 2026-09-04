@@ -16,9 +16,11 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+module;
+#include <Common.hpp>
+#include <imgui.h>
+#include <imgui_internal.h>
 module Figure;
-
-import "Common.hpp";
 
 Playable::~Playable()
 {

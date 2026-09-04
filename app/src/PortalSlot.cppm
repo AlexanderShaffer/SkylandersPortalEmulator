@@ -16,9 +16,10 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+module;
+#include <Common.hpp>
 export module PortalSlot;
 
-import "Common.hpp";
 import std;
 
 export class PortalSlot

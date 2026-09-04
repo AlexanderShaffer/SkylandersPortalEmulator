@@ -23,13 +23,13 @@ PortalSlot::PortalSlot(const int index, const std::filesystem::path& figureDumpP
     m_skylanderDump.exceptions(std::ios::failbit | std::ios::badbit);
 }
 
-void PortalSlot::readSkylanderDump(const std::span<uint8_t> output)
+void PortalSlot::readSkylanderDump(const std::span<std::uint8_t> output)
 {
     m_skylanderDump.seekg(std::ios::beg);
     m_skylanderDump.read(reinterpret_cast<char*>(output.data()), output.size());
 }
 
-void PortalSlot::writeSkylanderDump(const std::span<uint8_t> input)
+void PortalSlot::writeSkylanderDump(const std::span<std::uint8_t> input)
 {
     m_skylanderDump.seekg(std::ios::beg);
     m_skylanderDump.write(reinterpret_cast<const char*>(input.data()), input.size());

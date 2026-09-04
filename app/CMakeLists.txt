@@ -60,18 +60,14 @@ add_library(ImGui STATIC
     ${imgui_SOURCE_DIR}/backends/imgui_impl_sdl3.cpp
 )
 
-set(SDL_INCLUDE_OPTION "-I${sdl_SOURCE_DIR}/include")
-
-set(IMGUI_COMPILE_OPTIONS
-    "-I${imgui_SOURCE_DIR}"
-    ${SDL_INCLUDE_OPTION}
-    -DIMGUI_DEFINE_MATH_OPERATORS
-    -DIMGUI_DISABLE_DEMO_WINDOWS
-    -DIMGUI_DISABLE_DEBUG_TOOLS
-    -DIMGUI_DISABLE_DEFAULT_FONT
+target_compile_options(ImGui PUBLIC
+  -DIMGUI_DEFINE_MATH_OPERATORS
+  -DIMGUI_DISABLE_DEMO_WINDOWS
+  -DIMGUI_DISABLE_DEBUG_TOOLS
+  -DIMGUI_DISABLE_DEFAULT_FONT
 )
 
-target_compile_options(ImGui PUBLIC ${IMGUI_COMPILE_OPTIONS})
+target_include_directories(ImGui PUBLIC ${imgui_SOURCE_DIR})
 
 set(CMAKE_CXX_MODULE_STD ON)
 add_executable(SkylandersPortalEmulator WIN32)
@@ -97,18 +93,3 @@ target_sources(SkylandersPortalEmulator
 
 target_link_libraries(SkylandersPortalEmulator PRIVATE ImGui SDL3::SDL3 simpleble::simpleble)
 target_include_directories(SkylandersPortalEmulator PRIVATE ../common/ ${stb_SOURCE_DIR})
-target_compile_options(SkylandersPortalEmulator PRIVATE -Wno-experimental-header-units)
-
-set(STB_IMAGE_COMPILE_OPTIONS -DSTB_IMAGE_IMPLEMENTATION -DSTB_IMAGE_STATIC)
-include(HeaderUnitSupport.cmake)
-
-target_header_units(SkylandersPortalEmulator PRIVATE
-    HEADER_PATH "${imgui_SOURCE_DIR}/backends/imgui_impl_opengl3.h" COMPILE_OPTIONS IMGUI_COMPILE_OPTIONS
-    HEADER_PATH "${imgui_SOURCE_DIR}/backends/imgui_impl_opengl3_loader.h" COMPILE_OPTIONS IMGUI_COMPILE_OPTIONS
-    HEADER_PATH "${imgui_SOURCE_DIR}/backends/imgui_impl_sdl3.h" COMPILE_OPTIONS IMGUI_COMPILE_OPTIONS
-    HEADER_PATH "${imgui_SOURCE_DIR}/imgui_internal.h" COMPILE_OPTIONS IMGUI_COMPILE_OPTIONS
-    HEADER_PATH "${imgui_SOURCE_DIR}/imgui.h" COMPILE_OPTIONS IMGUI_COMPILE_OPTIONS
-    HEADER_PATH "${sdl_SOURCE_DIR}/include/SDL3/SDL.h" COMPILE_OPTIONS SDL_INCLUDE_OPTION
-    HEADER_PATH "${CMAKE_CURRENT_LIST_DIR}/../common/Common.hpp" COMPILE_OPTIONS NONE
-    HEADER_PATH "${stb_SOURCE_DIR}/stb_image.h" COMPILE_OPTIONS STB_IMAGE_COMPILE_OPTIONS
-)

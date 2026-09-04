@@ -16,10 +16,11 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+module;
+#include <imgui.h>
+#include <imgui_internal.h>
 export module Figure;
 
-import <imgui.h>;
-import <imgui_internal.h>;
 import std;
 import Texture;
 import PortalEmulator;

@@ -38,7 +38,7 @@ private:
 
 public:
 
-    void renderSkylanderButtons();
+    void renderSkylanderButtons(PortalEmulator& portalEmulator);
 
 private:
 
@@ -50,7 +50,6 @@ private:
 
 private:
 
-    PortalEmulator m_portalEmulator{};
     std::flat_map<std::string, FigureGroup> m_figureGroups{};
     std::vector<Texture> m_detachedTextures{};
     std::mutex m_mutex{};

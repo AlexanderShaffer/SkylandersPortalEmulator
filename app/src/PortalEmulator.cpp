@@ -16,15 +16,11 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+module;
+#include <SDL3/SDL.h>
+#include <simpleble/SimpleBLE.h>
+#include <Common.hpp>
 module PortalEmulator;
-
-import <SDL3/SDL.h>;
-//import <ws2tcpip.h>;
-
-PortalEmulator::~PortalEmulator()
-{
-    //WSACleanup();
-}
 
 [[nodiscard]] std::shared_ptr<PortalSlot> PortalEmulator::linkPortalSlot(const std::filesystem::path& figureDumpPath)
 {
@@ -34,7 +30,7 @@ PortalEmulator::~PortalEmulator()
         if (++firstAvailable >= m_portalSlots.size())
             return nullptr;
 
-    std::unique_lock lock{m_mutex};
+    std::unique_lock lock{m_connectionMutex};
     const auto& portalSlot{m_portalSlots[firstAvailable] = std::make_shared<PortalSlot>(firstAvailable, figureDumpPath)};
 
     m_sendRequests.emplace_back(std::bind_front(&PortalEmulator::requestPlayableLoad, this, std::cref(portalSlot)));
@@ -46,7 +42,7 @@ PortalEmulator::~PortalEmulator()
 bool PortalEmulator::requestUnload(const std::shared_ptr<PortalSlot>& portalSlot)
 {
     {
-        std::lock_guard lock{m_mutex};
+        std::lock_guard lock{m_connectionMutex};
 
         if (portalSlot->getState() != PortalSlotState::LOADED)
             return false;
@@ -59,6 +55,12 @@ bool PortalEmulator::requestUnload(const std::shared_ptr<PortalSlot>& portalSlot
 
     m_sendCondition.notify_all();
     return true;
+}
+
+[[nodiscard]] ConnectionStatus PortalEmulator::getConnectionStatus()
+{
+    std::lock_guard lock{m_statusMutex};
+    return m_connectionStatus;
 }
 
 bool PortalEmulator::connectToTcpClient()
@@ -127,45 +129,168 @@ bool PortalEmulator::validatePortalSlots() const
     return tcpSend(packet);
 }
 
+SimpleBLE::Peripheral PortalEmulator::connectToPico(const std::stop_token& token)
+{
+    if (!SimpleBLE::Adapter::bluetooth_enabled())
+    {
+        setConnectionStatus({"Bluetooth is unavailable or permission has not been granted", {1.0f, 0.0f, 0.0f, 1.0f}});
+        return {};
+    }
+
+    std::vector adapters{SimpleBLE::Adapter::get_adapters()};
+
+    if (adapters.empty())
+    {
+        setConnectionStatus({"No Bluetooth adapters detected", {1.0f, 0.5f, 0.0f, 1.0f}});
+        return {};
+    }
+
+    SimpleBLE::Adapter& adapter{adapters.front()};
+    std::mutex mutex{};
+    SimpleBLE::Peripheral pico{};
+    std::condition_variable_any stopCondition{};
+
+    adapter.set_callback_on_scan_found([&](SimpleBLE::Peripheral peripheral)
+    {
+        if (!pico.initialized() && peripheral.is_connectable() && peripheral.identifier() == "sky_portal_emulator")
+        {
+            {
+                std::lock_guard lock{mutex};
+                pico = peripheral;
+            }
+
+            stopCondition.notify_all();
+        }
+    });
+
+    adapter.scan_start();
+    setConnectionStatus({"Scanning...", {1.0f, 1.0f, 0.0f, 1.0f}});
+
+    {
+        std::unique_lock lock{mutex};
+
+        while (!token.stop_requested() && SimpleBLE::Adapter::bluetooth_enabled() && !pico.initialized())
+        {
+            constexpr auto WAIT_INTERVAL{std::chrono::milliseconds(1000)};
+            stopCondition.wait_for(lock, token, WAIT_INTERVAL, []{return false;});
+        }
+    }
+
+    adapter.scan_stop();
+    adapter.set_callback_on_scan_found(nullptr);
+    return pico;
+}
+
+namespace
+{
+std::pair<SimpleBLE::Service, SimpleBLE::Characteristic> validate(SimpleBLE::Peripheral& pico)
+{
+    for (SimpleBLE::Service& service : pico.services())
+    {
+        if (service.uuid() != "facef73e-132f-4415-bd65-73a2123d70a2")
+            continue;
+
+        const std::vector characteristics{service.characteristics()};
+
+        if (characteristics.size() != 1)
+            return {};
+
+        SimpleBLE::Characteristic characteristic{characteristics.front()};
+
+        if (characteristic.uuid() != "022dcf96-388f-4531-99ef-1cf30449ac93" || !characteristic.can_write_request() || !characteristic.can_indicate() ||
+            !characteristic.can_notify() || characteristic.can_read() || characteristic.can_write_command())
+            return {};
+
+        return {service, characteristic};
+    }
+
+    return {};
+}
+
+void disconnect(SimpleBLE::Peripheral& pico)
+{
+    try
+    {
+        pico.disconnect();
+    }
+    catch (const SimpleBLE::Exception::BaseException& e)
+    {
+        std::println(std::cerr, "A SimpleBLE execption occurred while disconnecting the pico: {}", e.what());
+    }
+}
+} // namespace
+
 void PortalEmulator::runNetworkThread(const std::stop_token& token)
 {
-    //WSADATA wsaData{};
-
-    //if (WSAStartup(WINSOCK_VERSION, &wsaData))
-        //throw std::runtime_error("WSAStartup failed");
+    std::condition_variable_any stopCondition{};
+    std::mutex mutex{};
 
     while (!token.stop_requested())
     {
-        if (!connectToTcpClient())
-            break;
+        SimpleBLE::Peripheral pico{connectToPico(token)};
 
+        if (!pico.initialized())
         {
-            std::lock_guard lock{m_mutex};
-            m_sendRequests.emplace_front(std::bind_front(&PortalEmulator::validatePortalSlots, this));
+            constexpr auto WAIT_INTERVAL{std::chrono::milliseconds(1000)};
+            std::unique_lock lock{mutex};
+            stopCondition.wait_for(lock, token, WAIT_INTERVAL, []{return false;});
+            continue;
         }
 
-        m_receivedTcpMessage = false;
-        m_connected = true;
+        setConnectionStatus({"Connecting...", {0.75f, 1.0f, 0.0f, 1.0f}});
 
-        std::jthread tcpReceiver{std::bind_front(&PortalEmulator::runTcpReceiver, this)};
-        std::jthread tcpSender{std::bind_front(&PortalEmulator::runTcpSender, this)};
-        std::jthread udpReceiver{std::bind_front(&PortalEmulator::runUdpReceiver, this)};
-
+        try
         {
-            std::unique_lock lock{m_mutex};
-            m_disconnectionCondition.wait(lock, [this]{return !m_connected;});
+            pico.connect();
+
+            if (const auto[service, characteristic]{validate(pico)}; !service.initialized() || !characteristic.initialized())
+            {
+                disconnect(pico);
+                continue;
+            }
+
+            setConnectionStatus({"Connected", {0.0f, 1.0f, 0.0f, 1.0f}});
+
+            {
+                std::unique_lock lock{mutex};
+                stopCondition.wait(lock, token, []{return false;});
+            }
+
+            disconnect(pico);
+        }
+        catch (const SimpleBLE::Exception::BaseException& e)
+        {
+            std::println(std::cerr, "A SimpleBLE exception occurred in Network thread: {}", e.what());
+            disconnect(pico);
         }
 
-        udpReceiver.request_stop();
-        tcpSender.request_stop();
-        tcpReceiver.request_stop();
-
-        //shutdown(m_udpClient, SD_BOTH);
-        //closesocket(m_udpClient);
-        //shutdown(m_tcpClient, SD_BOTH);
-        //closesocket(m_tcpClient);
-        m_receiveCondition.notify_all();
-        m_sendCondition.notify_all();
+        // {
+        //     std::lock_guard lock{m_connectionMutex};
+        //     m_sendRequests.emplace_front(std::bind_front(&PortalEmulator::validatePortalSlots, this));
+        // }
+        //
+        // m_receivedTcpMessage = false;
+        // m_connected = true;
+        //
+        // std::jthread tcpReceiver{std::bind_front(&PortalEmulator::runTcpReceiver, this)};
+        // std::jthread tcpSender{std::bind_front(&PortalEmulator::runTcpSender, this)};
+        // std::jthread udpReceiver{std::bind_front(&PortalEmulator::runUdpReceiver, this)};
+        //
+        // {
+        //     std::unique_lock lock{m_connectionMutex};
+        //     m_disconnectionCondition.wait(lock, [this]{return !m_connected;});
+        // }
+        //
+        // udpReceiver.request_stop();
+        // tcpSender.request_stop();
+        // tcpReceiver.request_stop();
+        //
+        // shutdown(m_udpClient, SD_BOTH);
+        // closesocket(m_udpClient);
+        // shutdown(m_tcpClient, SD_BOTH);
+        // closesocket(m_tcpClient);
+        // m_receiveCondition.notify_all();
+        // m_sendCondition.notify_all();
     }
 
     std::println("Network thread has terminated");
@@ -218,7 +343,7 @@ bool PortalEmulator::requestPlayableUnload(std::shared_ptr<PortalSlot>& portalSl
         portalSlot = nullptr;
 
         {
-            std::lock_guard lock{m_mutex};
+            std::lock_guard lock{m_connectionMutex};
             m_sendRequests.pop_front();
         }
 
@@ -263,7 +388,7 @@ void PortalEmulator::respond(const std::span<uint8_t> packet)
     {
         for (int i = 0; i < m_portalSlots.size(); i++)
         {
-            std::unique_lock lock{m_mutex};
+            std::unique_lock lock{m_connectionMutex};
 
             const auto& portalSlot{m_portalSlots[i]};
             const auto serverState{portalSlot ? portalSlot->getState() : PortalSlotState::UNLOADED};
@@ -307,7 +432,7 @@ void PortalEmulator::respond(const std::span<uint8_t> packet)
     }
 
     {
-        std::lock_guard lock{m_mutex};
+        std::lock_guard lock{m_connectionMutex};
         m_sendRequests.pop_front();
     }
 
@@ -321,7 +446,7 @@ void PortalEmulator::runTcpSender(const std::stop_token& token)
 
     while (!token.stop_requested())
     {
-        std::unique_lock lock{m_mutex};
+        std::unique_lock lock{m_connectionMutex};
         m_sendCondition.wait(lock, [&token, this]{return token.stop_requested() || !m_sendRequests.empty();});
 
         if (token.stop_requested())
@@ -434,4 +559,10 @@ void PortalEmulator::runUdpReceiver(const std::stop_token& token)
     m_connected = false;
     m_disconnectionCondition.notify_all();
     */
+}
+
+void PortalEmulator::setConnectionStatus(const ConnectionStatus& connectionStatus)
+{
+    std::lock_guard lock{m_statusMutex};
+    m_connectionStatus = connectionStatus;
 }

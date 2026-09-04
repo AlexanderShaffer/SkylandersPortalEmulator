@@ -16,14 +16,22 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+module;
+#include <Common.hpp>
+#include <SDL3/SDL.h>
+#include <imgui.h>
+#include <simpleble/SimpleBLE.h>
 export module PortalEmulator;
 
-import "Common.hpp";
-import <SDL3/SDL.h>;
-//import <winsock2.h>;
-import std;
 import PortalSlot;
 import Owner;
+import std;
+
+export struct ConnectionStatus
+{
+    std::string_view Message{};
+    ImVec4 Color{};
+};
 
 export class PortalEmulator
 {
@@ -34,7 +42,6 @@ public:
 public:
 
     PortalEmulator() = default;
-    ~PortalEmulator();
     PortalEmulator(const PortalEmulator&) = delete;
     PortalEmulator(PortalEmulator&&) = delete;
     PortalEmulator& operator=(const PortalEmulator&) = delete;
@@ -43,10 +50,12 @@ public:
     [[nodiscard]] std::shared_ptr<PortalSlot> linkPortalSlot(const std::filesystem::path& figureDumpPath);
     [[nodiscard]] bool requestUnload(const std::shared_ptr<PortalSlot>& portalSlot);
     [[nodiscard]] bool isConnected() const {return m_connected;}
+    [[nodiscard]] ConnectionStatus getConnectionStatus();
 
 private:
 
     [[nodiscard]] bool connectToTcpClient();
+    SimpleBLE::Peripheral connectToPico(const std::stop_token& token);
     [[nodiscard]] bool validatePortalSlots() const;
     void runNetworkThread(const std::stop_token& token);
     void runTcpReceiver(const std::stop_token& token);
@@ -57,6 +66,7 @@ private:
     void respond(std::span<uint8_t> packet);
     void runTcpSender(const std::stop_token& token);
     void runUdpReceiver(const std::stop_token& token);
+    void setConnectionStatus(const ConnectionStatus& connectionStatus);
 
 private:
 
@@ -64,14 +74,12 @@ private:
     std::condition_variable m_sendCondition{};
     std::condition_variable m_receiveCondition{};
     std::condition_variable m_disconnectionCondition{};
-    std::mutex m_mutex{};
+    std::mutex m_statusMutex{};
+    std::mutex m_connectionMutex{};
     bool m_receivedTcpMessage{};
     std::deque<std::function<bool()>> m_sendRequests{};
     bool m_connected{};
-    //SOCKET m_tcpClient{INVALID_SOCKET};
-    //SOCKET m_udpClient{INVALID_SOCKET};
-    //sockaddr m_clientAddress{};
+    ConnectionStatus m_connectionStatus{};
 
-    //TODO: Consider when multiple Raspberry Pis can connect to the same computer
     std::jthread m_networkThread{std::bind_front(&PortalEmulator::runNetworkThread, this)};
 };

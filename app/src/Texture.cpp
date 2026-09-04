@@ -16,9 +16,12 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+module;
+#include <backends/imgui_impl_opengl3_loader.h>
+#include <stb_image.h>
+#include <imgui.h>
+#include <imgui_internal.h>
 module Texture;
-
-import <backends/imgui_impl_opengl3_loader.h>;
 
 Texture::ImageState::~ImageState()
 {

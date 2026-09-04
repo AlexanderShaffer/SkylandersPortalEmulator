@@ -16,15 +16,17 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-import <SDL3/SDL.h>;
-import <backends/imgui_impl_opengl3_loader.h>;
-import <backends/imgui_impl_sdl3.h>;
-import <backends/imgui_impl_opengl3.h>;
+#include <SDL3/SDL.h>
+#include <backends/imgui_impl_opengl3_loader.h>
+#include <backends/imgui_impl_sdl3.h>
+#include <backends/imgui_impl_opengl3.h>
 import Owner;
+import PortalEmulator;
 import FigureLoader;
 
 int main()
 {
+    PortalEmulator portalEmulator{};
     const SdlOwner sdlOwner{};
     auto* const window{sdlOwner.getWindow()};
     const ImGuiOwner imGuiOwner{sdlOwner};
@@ -66,17 +68,20 @@ int main()
         if (ImGui::Button("Exit"))
             break;
 
-        ImGui::SameLine();
-
-        if (ImGui::Button(fullscreen ? "Fullscreen (F11): Enabled" : "Fullscreen (F11): Disabled"))
+        if (ImGui::Button(fullscreen ? "Fullscreen (F11): enabled" : "Fullscreen (F11): disabled"))
             SDL_SetWindowFullscreen(window, fullscreen = !fullscreen);
+
+        ImGui::Text("Pico W connection status:");
+        ImGui::SameLine();
+        auto[message, color]{portalEmulator.getConnectionStatus()};
+        ImGui::TextColored(color, "%s", message.data());
 
         SDL_Rect displayBounds;
         SDL_GetDisplayBounds(SDL_GetDisplayForWindow(window), &displayBounds);
         ImGui::GetStyle().ItemSpacing = maxItemSpacing * (io.DisplaySize.x / displayBounds.w);
         ImGui::GetStyle().WindowPadding = ImGui::GetStyle().ItemSpacing;
 
-        figureLoader.renderSkylanderButtons();
+        figureLoader.renderSkylanderButtons(portalEmulator);
         ImGui::End();
 
         ImGui::Render();

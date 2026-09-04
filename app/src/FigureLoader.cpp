@@ -16,11 +16,11 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+module;
+#include <imgui_internal.h>
 module FigureLoader;
 
-import <imgui_internal.h>;
-
-void FigureLoader::renderSkylanderButtons()
+void FigureLoader::renderSkylanderButtons(PortalEmulator& portalEmulator)
 {
     constexpr int SKYLANDERS_PER_ROW{6};
     const ImVec2 padding{ImGui::GetStyle().ItemSpacing * 2.0f};
@@ -47,7 +47,7 @@ void FigureLoader::renderSkylanderButtons()
 
         for (const auto& figure : group.Figures.values())
         {
-            figure->update(index, pos, imageWidth, swapperBottomsOnPortal, swapperTopsOnPortal, padding, m_portalEmulator);
+            figure->update(index, pos, imageWidth, swapperBottomsOnPortal, swapperTopsOnPortal, padding, portalEmulator);
 
             if (column++ % SKYLANDERS_PER_ROW != SKYLANDERS_PER_ROW - 1)
                 ImGui::SameLine();
@@ -59,7 +59,7 @@ void FigureLoader::renderSkylanderButtons()
     ImDrawList* const drawList{ImGui::GetCurrentWindow()->DrawList};
     const bool disableSwapperBottoms{swapperBottomsOnPortal > swapperTopsOnPortal};
     const bool disableSwapperTops{swapperTopsOnPortal > swapperBottomsOnPortal};
-    const bool connected{m_portalEmulator.isConnected()};
+    const bool connected{portalEmulator.isConnected()};
 
     for (const auto& group : m_figureGroups.values())
         for (auto& figure : group.Figures.values())

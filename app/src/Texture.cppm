@@ -16,12 +16,14 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+module;
+#define STB_IMAGE_IMPLEMENTATION
+#include <stb_image.h>
+#include <backends/imgui_impl_opengl3_loader.h>
+#include <imgui.h>
+#include <imgui_internal.h>
 export module Texture;
 
-import <stb_image.h>;
-import <backends/imgui_impl_opengl3_loader.h>;
-import <imgui.h>;
-import <imgui_internal.h>;
 import std;
 
 export class Texture

@@ -16,12 +16,13 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+module;
+#include <SDL3/SDL.h>
+#include <imgui.h>
+#include <backends/imgui_impl_sdl3.h>
+#include <backends/imgui_impl_opengl3.h>
 module Owner;
 
-import <SDL3/SDL.h>;
-import <imgui.h>;
-import <backends/imgui_impl_sdl3.h>;
-import <backends/imgui_impl_opengl3.h>;
 import Font;
 
 SdlOwner::SdlOwner()

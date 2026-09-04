@@ -16,9 +16,10 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+module;
+#include <SDL3/SDL.h>
 export module Owner;
 
-import <SDL3/SDL.h>;
 import std;
 
 export class SdlOwner
