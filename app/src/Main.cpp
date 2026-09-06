@@ -73,7 +73,7 @@ int main()
 
         ImGui::Text("Pico W connection status:");
         ImGui::SameLine();
-        auto[message, color]{portalEmulator.getConnectionStatus()};
+        auto[message, color, _]{portalEmulator.getConnectionStatus()};
         ImGui::TextColored(color, "%s", message.data());
 
         SDL_Rect displayBounds;

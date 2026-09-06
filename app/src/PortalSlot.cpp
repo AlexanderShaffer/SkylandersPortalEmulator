@@ -16,6 +16,8 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+module;
+#include <simpleble/SimpleBLE.h>
 module PortalSlot;
 
 PortalSlot::PortalSlot(const int index, const std::filesystem::path& figureDumpPath) : m_index{index}, m_skylanderDump{figureDumpPath, std::ios::binary | std::ios::in | std::ios::out}
@@ -29,7 +31,7 @@ void PortalSlot::readSkylanderDump(const std::span<std::uint8_t> output)
     m_skylanderDump.read(reinterpret_cast<char*>(output.data()), output.size());
 }
 
-void PortalSlot::writeSkylanderDump(const std::span<std::uint8_t> input)
+void PortalSlot::writeSkylanderDump(const SimpleBLE::ByteArray& input)
 {
     m_skylanderDump.seekg(std::ios::beg);
     m_skylanderDump.write(reinterpret_cast<const char*>(input.data()), input.size());

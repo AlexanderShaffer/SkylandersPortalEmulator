@@ -25,13 +25,8 @@ export module PortalEmulator;
 
 import PortalSlot;
 import Owner;
+import Gate;
 import std;
-
-export struct ConnectionStatus
-{
-    std::string_view Message{};
-    ImVec4 Color{};
-};
 
 export class PortalEmulator
 {
@@ -39,9 +34,17 @@ public:
 
     using PortalSlotIndex = int;
 
+    struct ConnectionStatus
+    {
+        std::string_view Message{};
+        ImVec4 Color{};
+        bool Connected{false};
+    };
+
 public:
 
-    PortalEmulator() = default;
+    PortalEmulator();
+    ~PortalEmulator();
     PortalEmulator(const PortalEmulator&) = delete;
     PortalEmulator(PortalEmulator&&) = delete;
     PortalEmulator& operator=(const PortalEmulator&) = delete;
@@ -49,37 +52,38 @@ public:
 
     [[nodiscard]] std::shared_ptr<PortalSlot> linkPortalSlot(const std::filesystem::path& figureDumpPath);
     [[nodiscard]] bool requestUnload(const std::shared_ptr<PortalSlot>& portalSlot);
-    [[nodiscard]] bool isConnected() const {return m_connected;}
     [[nodiscard]] ConnectionStatus getConnectionStatus();
 
 private:
 
-    [[nodiscard]] bool connectToTcpClient();
-    SimpleBLE::Peripheral connectToPico(const std::stop_token& token);
-    [[nodiscard]] bool validatePortalSlots() const;
-    void runNetworkThread(const std::stop_token& token);
-    void runTcpReceiver(const std::stop_token& token);
-    [[nodiscard]] bool requestPlayableLoad(const std::shared_ptr<PortalSlot>& portalSlot) const;
+    void scanForPico(const std::stop_token& token);
+    void validatePico();
+    void disconnectFromPico();
+    void connectToPico(const std::stop_token& token);
+    void runBluetoothThread(const std::stop_token& token);
+    [[nodiscard]] bool requestPlayableLoad(const std::shared_ptr<PortalSlot>& portalSlot);
     [[nodiscard]] bool requestPlayableUnload(std::shared_ptr<PortalSlot>& portalSlot);
-    [[nodiscard]] bool tcpSend(std::span<uint8_t> packet) const;
-    [[nodiscard]] bool tcpReceive(std::span<uint8_t> buffer) const;
-    void respond(std::span<uint8_t> packet);
-    void runTcpSender(const std::stop_token& token);
-    void runUdpReceiver(const std::stop_token& token);
+    [[nodiscard]] bool writeRequest(std::span<uint8_t> packet);
+    void popWriteRequest();
+    void respondToIndication(const SimpleBLE::ByteArray&);
+    void respondToNotification(const SimpleBLE::ByteArray&) const;
+    bool validatePortalSlots();
+    void runWriteRequester(const std::stop_token& token);
     void setConnectionStatus(const ConnectionStatus& connectionStatus);
 
 private:
 
     std::array<std::shared_ptr<PortalSlot>, PORTAL_SLOT_COUNT> m_portalSlots{};
-    std::condition_variable m_sendCondition{};
-    std::condition_variable m_receiveCondition{};
-    std::condition_variable m_disconnectionCondition{};
-    std::mutex m_statusMutex{};
-    std::mutex m_connectionMutex{};
-    bool m_receivedTcpMessage{};
-    std::deque<std::function<bool()>> m_sendRequests{};
-    bool m_connected{};
+    Gate m_disconnectionGate{};
+    Gate m_indicationGate{};
+    std::condition_variable_any m_writeCondition{};
+    std::mutex m_mutex{};
+    std::queue<std::function<bool()>> m_writeRequests{};
     ConnectionStatus m_connectionStatus{};
+    SimpleBLE::Peripheral m_pico{};
+    SimpleBLE::Service m_service{};
+    SimpleBLE::Characteristic m_characteristic{};
+    SDL_AudioStream* m_audioStream{};
 
-    std::jthread m_networkThread{std::bind_front(&PortalEmulator::runNetworkThread, this)};
+    std::jthread m_networkThread{std::bind_front(&PortalEmulator::runBluetoothThread, this)};
 };

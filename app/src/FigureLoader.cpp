@@ -59,7 +59,7 @@ void FigureLoader::renderSkylanderButtons(PortalEmulator& portalEmulator)
     ImDrawList* const drawList{ImGui::GetCurrentWindow()->DrawList};
     const bool disableSwapperBottoms{swapperBottomsOnPortal > swapperTopsOnPortal};
     const bool disableSwapperTops{swapperTopsOnPortal > swapperBottomsOnPortal};
-    const bool connected{portalEmulator.isConnected()};
+    const bool connected{portalEmulator.getConnectionStatus().Connected};
 
     for (const auto& group : m_figureGroups.values())
         for (auto& figure : group.Figures.values())

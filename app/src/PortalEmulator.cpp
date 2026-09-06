@@ -17,32 +17,48 @@
  */
 
 module;
-#include <SDL3/SDL.h>
 #include <simpleble/SimpleBLE.h>
 #include <Common.hpp>
+#include <SDL3/SDL.h>
 module PortalEmulator;
+
+PortalEmulator::PortalEmulator()
+{
+    static constexpr SDL_AudioSpec AUDIO_SPEC{.format = SDL_AUDIO_S16LE, .channels = 1, .freq = 8000};
+
+    m_audioStream = SDL_OpenAudioDeviceStream(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, &AUDIO_SPEC, nullptr, nullptr);
+
+    if (m_audioStream)
+        SDL_ResumeAudioStreamDevice(m_audioStream);
+}
+
+PortalEmulator::~PortalEmulator()
+{
+    SDL_DestroyAudioStream(m_audioStream);
+}
 
 [[nodiscard]] std::shared_ptr<PortalSlot> PortalEmulator::linkPortalSlot(const std::filesystem::path& figureDumpPath)
 {
     PortalSlotIndex firstAvailable{0};
+    std::unique_lock lock{m_mutex};
 
     while (m_portalSlots[firstAvailable])
         if (++firstAvailable >= m_portalSlots.size())
             return nullptr;
 
-    std::unique_lock lock{m_connectionMutex};
     const auto& portalSlot{m_portalSlots[firstAvailable] = std::make_shared<PortalSlot>(firstAvailable, figureDumpPath)};
 
-    m_sendRequests.emplace_back(std::bind_front(&PortalEmulator::requestPlayableLoad, this, std::cref(portalSlot)));
+    portalSlot->setState(PortalSlotState::LOADING);
+    m_writeRequests.emplace(std::bind_front(&PortalEmulator::requestPlayableLoad, this, std::cref(portalSlot)));
     lock.unlock();
-    m_sendCondition.notify_all();
+    m_writeCondition.notify_all();
     return portalSlot;
 }
 
 bool PortalEmulator::requestUnload(const std::shared_ptr<PortalSlot>& portalSlot)
 {
     {
-        std::lock_guard lock{m_connectionMutex};
+        std::lock_guard lock{m_mutex};
 
         if (portalSlot->getState() != PortalSlotState::LOADED)
             return false;
@@ -50,113 +66,46 @@ bool PortalEmulator::requestUnload(const std::shared_ptr<PortalSlot>& portalSlot
         auto ref{std::ref(m_portalSlots[portalSlot->getIndex()])};
 
         portalSlot->setState(PortalSlotState::UNLOADING);
-        m_sendRequests.emplace_back(std::bind_front(&PortalEmulator::requestPlayableUnload, this, ref));
+        m_writeRequests.emplace(std::bind_front(&PortalEmulator::requestPlayableUnload, this, ref));
     }
 
-    m_sendCondition.notify_all();
+    m_writeCondition.notify_all();
     return true;
 }
 
-[[nodiscard]] ConnectionStatus PortalEmulator::getConnectionStatus()
+[[nodiscard]] auto PortalEmulator::getConnectionStatus() -> ConnectionStatus
 {
-    std::lock_guard lock{m_statusMutex};
+    std::lock_guard lock{m_mutex};
     return m_connectionStatus;
 }
 
-bool PortalEmulator::connectToTcpClient()
-{
-    /*
-    addrinfo hints{};
-    hints.ai_family = AF_INET;
-    hints.ai_socktype = SOCK_STREAM;
-    hints.ai_protocol = IPPROTO_TCP;
-    hints.ai_flags = AI_PASSIVE;
-
-    addrinfo* address{nullptr};
-
-    if (getaddrinfo(nullptr, std::to_string(TCP_PORT).c_str(), &hints, &address))
-        throw std::runtime_error("Failed to get address info");
-
-    SOCKET listenSocket{socket(address->ai_family, address->ai_socktype, address->ai_protocol)};
-
-    if (listenSocket == INVALID_SOCKET)
-    {
-        freeaddrinfo(address);
-        throw std::runtime_error("Failed to create listen socket");
-    }
-
-    if (bind(listenSocket, address->ai_addr, address->ai_addrlen) == SOCKET_ERROR)
-    {
-        freeaddrinfo(address);
-        closesocket(listenSocket);
-        throw std::runtime_error("Failed to bind listen socket");
-    }
-
-    freeaddrinfo(address);
-
-    if (listen(listenSocket, SOMAXCONN) == SOCKET_ERROR)
-    {
-        closesocket(listenSocket);
-        throw std::runtime_error("Failed to listen for connection");
-    }
-
-    std::println("Listening for TCP connection");
-    int length{sizeof(m_clientAddress)};
-    m_tcpClient = accept(listenSocket, &m_clientAddress, &length);
-
-    if (m_tcpClient == INVALID_SOCKET)
-    {
-        std::println("Failed to accept TCP connection");
-        closesocket(listenSocket);
-        return false;
-    }
-
-    std::println("TCP connection established");
-    closesocket(listenSocket);
-    return true;
-    */
-    return false;
-}
-
-bool PortalEmulator::validatePortalSlots() const
-{
-    std::array<uint8_t, 2 * sizeof(uint8_t) + sizeof(PacketType) + PORTAL_SLOT_COUNT> packet{};
-
-    for (int i = 0; i < m_portalSlots.size(); i++)
-        packet[3 + i] = static_cast<uint8_t>(m_portalSlots[i] ? m_portalSlots[i]->getState() : PortalSlotState::UNLOADED);
-
-    packet[2] = PacketType::VALIDATE_PORTAL_SLOTS;
-    return tcpSend(packet);
-}
-
-SimpleBLE::Peripheral PortalEmulator::connectToPico(const std::stop_token& token)
+void PortalEmulator::scanForPico(const std::stop_token& token)
 {
     if (!SimpleBLE::Adapter::bluetooth_enabled())
     {
-        setConnectionStatus({"Bluetooth is unavailable or permission has not been granted", {1.0f, 0.0f, 0.0f, 1.0f}});
-        return {};
+        setConnectionStatus({.Message = "Bluetooth is unavailable or permission has not been granted", .Color = {1.0f, 0.0f, 0.0f, 1.0f}});
+        return;
     }
 
     std::vector adapters{SimpleBLE::Adapter::get_adapters()};
 
     if (adapters.empty())
     {
-        setConnectionStatus({"No Bluetooth adapters detected", {1.0f, 0.5f, 0.0f, 1.0f}});
-        return {};
+        setConnectionStatus({.Message = "No Bluetooth adapters detected", .Color = {1.0f, 0.5f, 0.0f, 1.0f}});
+        return;
     }
 
     SimpleBLE::Adapter& adapter{adapters.front()};
     std::mutex mutex{};
-    SimpleBLE::Peripheral pico{};
     std::condition_variable_any stopCondition{};
 
     adapter.set_callback_on_scan_found([&](SimpleBLE::Peripheral peripheral)
     {
-        if (!pico.initialized() && peripheral.is_connectable() && peripheral.identifier() == "sky_portal_emulator")
+        if (!m_pico.initialized() && peripheral.is_connectable() && peripheral.identifier() == "sky_portal_emulator")
         {
             {
                 std::lock_guard lock{mutex};
-                pico = peripheral;
+                m_pico = peripheral;
             }
 
             stopCondition.notify_all();
@@ -164,12 +113,12 @@ SimpleBLE::Peripheral PortalEmulator::connectToPico(const std::stop_token& token
     });
 
     adapter.scan_start();
-    setConnectionStatus({"Scanning...", {1.0f, 1.0f, 0.0f, 1.0f}});
+    setConnectionStatus({.Message = "Scanning...", .Color = {1.0f, 1.0f, 0.0f, 1.0f}});
 
     {
         std::unique_lock lock{mutex};
 
-        while (!token.stop_requested() && SimpleBLE::Adapter::bluetooth_enabled() && !pico.initialized())
+        while (!token.stop_requested() && SimpleBLE::Adapter::bluetooth_enabled() && !m_pico.initialized())
         {
             constexpr auto WAIT_INTERVAL{std::chrono::milliseconds(1000)};
             stopCondition.wait_for(lock, token, WAIT_INTERVAL, []{return false;});
@@ -177,15 +126,11 @@ SimpleBLE::Peripheral PortalEmulator::connectToPico(const std::stop_token& token
     }
 
     adapter.scan_stop();
-    adapter.set_callback_on_scan_found(nullptr);
-    return pico;
 }
 
-namespace
+void PortalEmulator::validatePico()
 {
-std::pair<SimpleBLE::Service, SimpleBLE::Characteristic> validate(SimpleBLE::Peripheral& pico)
-{
-    for (SimpleBLE::Service& service : pico.services())
+    for (SimpleBLE::Service& service : m_pico.services())
     {
         if (service.uuid() != "facef73e-132f-4415-bd65-73a2123d70a2")
             continue;
@@ -193,147 +138,94 @@ std::pair<SimpleBLE::Service, SimpleBLE::Characteristic> validate(SimpleBLE::Per
         const std::vector characteristics{service.characteristics()};
 
         if (characteristics.size() != 1)
-            return {};
+            return;
 
-        SimpleBLE::Characteristic characteristic{characteristics.front()};
-
-        if (characteristic.uuid() != "022dcf96-388f-4531-99ef-1cf30449ac93" || !characteristic.can_write_request() || !characteristic.can_indicate() ||
-            !characteristic.can_notify() || characteristic.can_read() || characteristic.can_write_command())
-            return {};
-
-        return {service, characteristic};
+        if (SimpleBLE::Characteristic characteristic{characteristics.front()}; characteristic.uuid() == "022dcf96-388f-4531-99ef-1cf30449ac93" &&
+            characteristic.can_write_request() && characteristic.can_indicate() && characteristic.can_notify() && !characteristic.can_read() && !characteristic.can_write_command())
+        {
+            m_service = service;
+            m_characteristic = characteristic;
+        }
     }
-
-    return {};
 }
 
-void disconnect(SimpleBLE::Peripheral& pico)
+void PortalEmulator::disconnectFromPico()
 {
     try
     {
-        pico.disconnect();
+        if (m_pico.initialized())
+            m_pico.disconnect();
     }
     catch (const SimpleBLE::Exception::BaseException& e)
     {
-        std::println(std::cerr, "A SimpleBLE execption occurred while disconnecting the pico: {}", e.what());
+        std::println(std::cerr, "A SimpleBLE exception occurred while disconnecting from the pico: {}", e.what());
     }
+
+    setConnectionStatus({.Message = "Disconnected", .Color = {0.1f, 1.0f, 0.0f, 1.0f}});
+    m_pico = {};
+    m_service = {};
+    m_characteristic = {};
 }
-} // namespace
 
-void PortalEmulator::runNetworkThread(const std::stop_token& token)
+void PortalEmulator::connectToPico(const std::stop_token& token)
 {
-    std::condition_variable_any stopCondition{};
-    std::mutex mutex{};
+    m_disconnectionGate.closeIfNotAlready();
+    m_pico.set_callback_on_disconnected([this]{m_disconnectionGate.openIfNotAlready();});
+    setConnectionStatus({.Message = "Connecting...", .Color = {0.75f, 1.0f, 0.0f, 1.0f}});
+    m_pico.connect();
+    validatePico();
 
+    if (!m_service.initialized() || !m_characteristic.initialized())
+        return;
+
+    m_pico.indicate(m_service.uuid(), m_characteristic.uuid(), std::bind_front(&PortalEmulator::respondToIndication, this));
+    m_pico.notify(m_service.uuid(), m_characteristic.uuid(), std::bind_front(&PortalEmulator::respondToNotification, this));
+    std::jthread writeRequester{std::bind_front(&PortalEmulator::runWriteRequester, this)};
+
+    setConnectionStatus({.Message = "Connected", .Color = {0.0f, 1.0f, 0.0f, 1.0f}, .Connected = true});
+    m_disconnectionGate.enterThroughAsSoonAsPossible(token);
+}
+
+void PortalEmulator::runBluetoothThread(const std::stop_token& token)
+{
     while (!token.stop_requested())
     {
-        SimpleBLE::Peripheral pico{connectToPico(token)};
-
-        if (!pico.initialized())
-        {
-            constexpr auto WAIT_INTERVAL{std::chrono::milliseconds(1000)};
-            std::unique_lock lock{mutex};
-            stopCondition.wait_for(lock, token, WAIT_INTERVAL, []{return false;});
-            continue;
-        }
-
-        setConnectionStatus({"Connecting...", {0.75f, 1.0f, 0.0f, 1.0f}});
-
         try
         {
-            pico.connect();
+            disconnectFromPico();
+            scanForPico(token);
 
-            if (const auto[service, characteristic]{validate(pico)}; !service.initialized() || !characteristic.initialized())
+            if (!m_pico.initialized())
             {
-                disconnect(pico);
+                constexpr auto WAIT_INTERVAL{std::chrono::milliseconds(1000)};
+                std::condition_variable_any stopCondition{};
+                std::mutex mutex{};
+                std::unique_lock lock{mutex};
+                stopCondition.wait_for(lock, token, WAIT_INTERVAL, []{return false;});
                 continue;
             }
 
-            setConnectionStatus({"Connected", {0.0f, 1.0f, 0.0f, 1.0f}});
-
-            {
-                std::unique_lock lock{mutex};
-                stopCondition.wait(lock, token, []{return false;});
-            }
-
-            disconnect(pico);
+            connectToPico(token);
         }
         catch (const SimpleBLE::Exception::BaseException& e)
         {
-            std::println(std::cerr, "A SimpleBLE exception occurred in Network thread: {}", e.what());
-            disconnect(pico);
+            std::println(std::cerr, "A SimpleBLE exception occurred in the Bluetooth thread: {}", e.what());
         }
-
-        // {
-        //     std::lock_guard lock{m_connectionMutex};
-        //     m_sendRequests.emplace_front(std::bind_front(&PortalEmulator::validatePortalSlots, this));
-        // }
-        //
-        // m_receivedTcpMessage = false;
-        // m_connected = true;
-        //
-        // std::jthread tcpReceiver{std::bind_front(&PortalEmulator::runTcpReceiver, this)};
-        // std::jthread tcpSender{std::bind_front(&PortalEmulator::runTcpSender, this)};
-        // std::jthread udpReceiver{std::bind_front(&PortalEmulator::runUdpReceiver, this)};
-        //
-        // {
-        //     std::unique_lock lock{m_connectionMutex};
-        //     m_disconnectionCondition.wait(lock, [this]{return !m_connected;});
-        // }
-        //
-        // udpReceiver.request_stop();
-        // tcpSender.request_stop();
-        // tcpReceiver.request_stop();
-        //
-        // shutdown(m_udpClient, SD_BOTH);
-        // closesocket(m_udpClient);
-        // shutdown(m_tcpClient, SD_BOTH);
-        // closesocket(m_tcpClient);
-        // m_receiveCondition.notify_all();
-        // m_sendCondition.notify_all();
     }
 
-    std::println("Network thread has terminated");
+    disconnectFromPico();
 }
 
-void PortalEmulator::runTcpReceiver(const std::stop_token& token)
+bool PortalEmulator::requestPlayableLoad(const std::shared_ptr<PortalSlot>& portalSlot)
 {
-    std::println("TCP receiver has started");
-
-    std::array<uint8_t, MAX_PACKET_SIZE> buffer;
-
-    while (!token.stop_requested())
-    {
-        constexpr std::size_t PACKET_SIZE_BYTES{2};
-
-        if (!tcpReceive({buffer.data(), PACKET_SIZE_BYTES}))
-            break;
-
-        const std::size_t packetSize{static_cast<std::size_t>(buffer[0] << 8 | buffer[1])};
-        const auto packetDataSize{packetSize - PACKET_SIZE_BYTES};
-        const std::span packet{buffer.data(), packetDataSize};
-
-        if (!tcpReceive(packet))
-            break;
-
-        respond(packet);
-    }
-
-    std::println("TCP receiver has terminated");
-    m_connected = false;
-    m_disconnectionCondition.notify_all();
-}
-
-bool PortalEmulator::requestPlayableLoad(const std::shared_ptr<PortalSlot>& portalSlot) const
-{
-    std::array<uint8_t, 2 * sizeof(uint8_t) + sizeof(PacketType) + sizeof(uint8_t) + FIGURE_DUMP_SIZE> packet;
-    auto* pos = packet.data() + 2;
+    std::array<uint8_t, sizeof(PacketType) + sizeof(uint8_t) + FIGURE_DUMP_SIZE> packet;
+    auto* pos = packet.data();
 
     *pos++ = PacketType::LOAD_FIGURE;
     *pos++ = static_cast<uint8_t>(portalSlot->getIndex());
     portalSlot->readSkylanderDump({pos, FIGURE_DUMP_SIZE});
 
-    return tcpSend(packet);
+    return writeRequest(packet);
 }
 
 bool PortalEmulator::requestPlayableUnload(std::shared_ptr<PortalSlot>& portalSlot)
@@ -341,65 +233,52 @@ bool PortalEmulator::requestPlayableUnload(std::shared_ptr<PortalSlot>& portalSl
     if (portalSlot->getState() == PortalSlotState::UNLOADED)
     {
         portalSlot = nullptr;
-
-        {
-            std::lock_guard lock{m_connectionMutex};
-            m_sendRequests.pop_front();
-        }
-
-        m_receivedTcpMessage = true;
+        popWriteRequest();
         return true;
     }
 
-    std::array<uint8_t, 2 * sizeof(uint8_t) + sizeof(PacketType) + sizeof(uint8_t)> packet{'\0', '\0', PacketType::UNLOAD_FIGURE, static_cast<uint8_t>(portalSlot->getIndex())};
-    return tcpSend(packet);
+    std::array<uint8_t, sizeof(PacketType) + sizeof(uint8_t)> packet{PacketType::UNLOAD_FIGURE, static_cast<uint8_t>(portalSlot->getIndex())};
+    return writeRequest(packet);
 }
 
-bool PortalEmulator::tcpSend(const std::span<uint8_t> packet) const
+bool PortalEmulator::writeRequest(const std::span<uint8_t> packet)
 {
-    packet[0] = packet.size() >> 8;
-    packet[1] = packet.size();
-
-    //if (send(m_tcpClient, reinterpret_cast<const char*>(packet.data()), packet.size(), 0) != packet.size())
-    //{
-        //std::println("Failed to send data: {}", WSAGetLastError());
-        //return false;
-    //}
-
-    //return true;
-    return false;
+    try
+    {
+        m_pico.write_request(m_service.uuid(), m_characteristic.uuid(), {packet.data(), packet.size()});
+        return true;
+    }
+    catch (const SimpleBLE::Exception::BaseException& e)
+    {
+        std::println(std::cerr, "A SimpleBLE exception occurred while performing a write request: {}", e.what());
+        return false;
+    }
 }
 
-[[nodiscard]] bool PortalEmulator::tcpReceive(const std::span<uint8_t> buffer) const
+void PortalEmulator::popWriteRequest()
 {
-    //const int bytesReceived{recv(m_tcpClient, reinterpret_cast<char*>(buffer.data()), buffer.size(), MSG_WAITALL)};
-    //const bool success{bytesReceived == buffer.size()};
-
-    //if (!success)
-        //std::println("TCP receive failed with code: {}", WSAGetLastError());
-
-    //return success;
-    return false;
+    m_writeRequests.pop();
+    m_indicationGate.openIfNotAlready();
 }
 
-void PortalEmulator::respond(const std::span<uint8_t> packet)
+void PortalEmulator::respondToIndication(const SimpleBLE::ByteArray& packet)
 {
+    std::lock_guard lock{m_mutex};
+
     if (packet[0] == PacketType::VALIDATE_PORTAL_SLOTS)
     {
         for (int i = 0; i < m_portalSlots.size(); i++)
         {
-            std::unique_lock lock{m_connectionMutex};
-
             const auto& portalSlot{m_portalSlots[i]};
-            const auto serverState{portalSlot ? portalSlot->getState() : PortalSlotState::UNLOADED};
-            const auto clientLoaded{static_cast<bool>(packet[1 + i])};
+            const auto appSlotState{portalSlot ? portalSlot->getState() : PortalSlotState::UNLOADED};
+            const auto picoSlotLoaded{static_cast<bool>(packet[1 + i])};
 
-            if (serverState == PortalSlotState::LOADED && !clientLoaded)
+            if (appSlotState == PortalSlotState::LOADED && !picoSlotLoaded)
             {
                 portalSlot->setState(PortalSlotState::LOADING);
-                m_sendRequests.emplace_back(std::bind_front(&PortalEmulator::requestPlayableLoad, this, std::cref(portalSlot)));
+                m_writeRequests.emplace(std::bind_front(&PortalEmulator::requestPlayableLoad, this, std::cref(portalSlot)));
             }
-            else if (serverState == PortalSlotState::UNLOADING && !clientLoaded)
+            else if (appSlotState == PortalSlotState::UNLOADING && !picoSlotLoaded)
                 portalSlot->setState(PortalSlotState::UNLOADED);
         }
     }
@@ -409,7 +288,7 @@ void PortalEmulator::respond(const std::span<uint8_t> packet)
         const auto& portalSlot{m_portalSlots[portalSlotIndex]};
 
         if(portalSlot->getState() != PortalSlotState::LOADING)
-            std::println("ERROR: The portal slot should be in the LOADING state before transitioning to the LOADED state");
+            std::println(std::cerr, "The portal slot should be in the LOADING state before transitioning to the LOADED state");
 
         portalSlot->setState(PortalSlotState::LOADED);
     }
@@ -419,150 +298,75 @@ void PortalEmulator::respond(const std::span<uint8_t> packet)
         auto& portalSlot{m_portalSlots[portalSlotIndex]};
 
         if(portalSlot->getState() != PortalSlotState::UNLOADING)
-            std::println("ERROR: The portal slot should be in the UNLOADING state before transitioning to the UNLOADED state");
+            std::println(std::cerr, "The portal slot should be in the UNLOADING state before transitioning to the UNLOADED state");
 
-        portalSlot->writeSkylanderDump(packet.subspan(2));
+        portalSlot->writeSkylanderDump(packet.slice_from(2));
         portalSlot->setState(PortalSlotState::UNLOADED);
         portalSlot = nullptr;
     }
     else
     {
-        std::println("ERROR: Unknown packet type received: {}", packet[0]);
+        std::println(std::cerr, "Unknown packet type received: {}", packet[0]);
         return;
     }
 
-    {
-        std::lock_guard lock{m_connectionMutex};
-        m_sendRequests.pop_front();
-    }
-
-    m_receivedTcpMessage = true;
-    m_receiveCondition.notify_all();
+    popWriteRequest();
 }
 
-void PortalEmulator::runTcpSender(const std::stop_token& token)
+void PortalEmulator::respondToNotification(const SimpleBLE::ByteArray& packet) const
 {
-    std::println("TCP sender has started");
+    if (!m_audioStream)
+        return;
+
+    if (!SDL_PutAudioStreamData(m_audioStream, packet.data(), static_cast<int>(packet.size())))
+        std::println(std::cerr, "Failed to put audio stream data: {}", SDL_GetError());
+}
+
+bool PortalEmulator::validatePortalSlots()
+{
+    std::lock_guard lock{m_mutex};
+    std::array<uint8_t, sizeof(PacketType) + PORTAL_SLOT_COUNT> packet;
+
+    packet[0] = PacketType::VALIDATE_PORTAL_SLOTS;
+
+    for (int i = 0; i < m_portalSlots.size(); i++)
+        packet[1 + i] = static_cast<uint8_t>(m_portalSlots[i] ? m_portalSlots[i]->getState() : PortalSlotState::UNLOADED);
+
+    return writeRequest(packet);
+}
+
+void PortalEmulator::runWriteRequester(const std::stop_token& token)
+{
+    if (!validatePortalSlots())
+    {
+        m_disconnectionGate.openIfNotAlready();
+        return;
+    }
 
     while (!token.stop_requested())
     {
-        std::unique_lock lock{m_connectionMutex};
-        m_sendCondition.wait(lock, [&token, this]{return token.stop_requested() || !m_sendRequests.empty();});
+        std::unique_lock lock{m_mutex};
+        m_writeCondition.wait(lock, token, [this]{return !m_writeRequests.empty();});
 
         if (token.stop_requested())
             break;
 
-        const auto& request{m_sendRequests.front()};
-        lock.unlock();
+        const auto& request{m_writeRequests.front()};
+
+        m_indicationGate.closeIfNotAlready();
 
         if (!request())
             break;
 
-        lock.lock();
-        m_receiveCondition.wait(lock, [&token, this]{return token.stop_requested() || m_receivedTcpMessage;});
-
-        m_receivedTcpMessage = false;
-
-        if(token.stop_requested())
-            break;
+        lock.unlock();
+        m_indicationGate.enterThroughAsSoonAsPossible(token);
     }
 
-    std::println("TCP sender has terminated");
-    m_connected = false;
-    m_disconnectionCondition.notify_all();
-}
-
-void PortalEmulator::runUdpReceiver(const std::stop_token& token)
-{
-    /*
-    constexpr SDL_AudioSpec spec{.format = SDL_AUDIO_S16LE, .channels = 1, .freq = 8000};
-
-    SDL_AudioStream* audioStream{SDL_OpenAudioDeviceStream(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, &spec, nullptr, nullptr)};
-
-    if (!audioStream)
-        throw std::runtime_error("Failed to open audio device");
-
-    SDL_ResumeAudioStreamDevice(audioStream);
-
-    m_udpClient = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
-
-    if (m_udpClient == INVALID_SOCKET)
-    {
-        WSACleanup();
-        throw std::runtime_error("Creating socket failed with error");
-    }
-
-    constexpr DWORD TIMEOUT{3000};
-    setsockopt(m_udpClient, SOL_SOCKET, SO_RCVTIMEO, reinterpret_cast<const char*>(&TIMEOUT), sizeof(TIMEOUT));
-
-    sockaddr_in serverAddress{};
-
-    serverAddress.sin_family = AF_INET;
-    serverAddress.sin_port = htons(UDP_PORT);
-    serverAddress.sin_addr.s_addr = INADDR_ANY;
-
-    if (bind(m_udpClient, reinterpret_cast<sockaddr*>(&serverAddress), sizeof(serverAddress)) == SOCKET_ERROR)
-    {
-        closesocket(m_udpClient);
-        WSACleanup();
-        throw std::runtime_error("Bind failed with error");
-    }
-
-    sockaddr clientAddress{};
-    sockaddr_in* const address{reinterpret_cast<sockaddr_in*>(&clientAddress)};
-
-    address->sin_family = AF_INET;
-    address->sin_port = htons(UDP_PORT);
-    address->sin_addr.s_addr = inet_addr(PICO_IPV4_ADDRESS);
-
-    std::println("UDP receiver has started");
-
-    std::array<uint8_t, MUSIC_DATAGRAM_SIZE> datagram;
-    auto lastSendTimePoint{std::chrono::system_clock::now().time_since_epoch()};
-
-    while (!token.stop_requested())
-    {
-        const auto bytesReceived{recvfrom(m_udpClient, reinterpret_cast<char*>(datagram.data()), datagram.size(), 0, nullptr, nullptr)};
-
-        if (bytesReceived <= 0)
-        {
-            std::println("UDP receive failed with code: {}", WSAGetLastError());
-            break;
-        }
-
-        if (bytesReceived == 1)
-            continue;
-
-        if (constexpr int MIN_AUDIO_BYTES_QUEUED{128}; SDL_GetAudioStreamQueued(audioStream) < MIN_AUDIO_BYTES_QUEUED)
-        {
-            constexpr std::array<uint8_t, 4 * 1024> SILENT_AUDIO{};
-            SDL_PutAudioStreamData(audioStream, SILENT_AUDIO.data(), SILENT_AUDIO.size());
-        }
-
-        if (!SDL_PutAudioStreamData(audioStream, datagram.data(), bytesReceived))
-            std::println("Failed to put audio stream data: {}", SDL_GetError());
-
-        constexpr auto SEND_DELAY{std::chrono::milliseconds(10)};
-        const auto now{std::chrono::system_clock::now().time_since_epoch()};
-
-        if (now - lastSendTimePoint > SEND_DELAY)
-        {
-            const int bytesQueued{SDL_GetAudioStreamQueued(audioStream)};
-            sendto(m_udpClient, reinterpret_cast<const char*>(&bytesQueued), sizeof(bytesQueued), 0, &clientAddress, sizeof(clientAddress));
-            lastSendTimePoint = now;
-        }
-    }
-
-    SDL_DestroyAudioStream(audioStream);
-
-    std::println("UDP receiver has terminated");
-    m_connected = false;
-    m_disconnectionCondition.notify_all();
-    */
+    m_disconnectionGate.openIfNotAlready();
 }
 
 void PortalEmulator::setConnectionStatus(const ConnectionStatus& connectionStatus)
 {
-    std::lock_guard lock{m_statusMutex};
+    std::lock_guard lock{m_mutex};
     m_connectionStatus = connectionStatus;
 }

@@ -18,6 +18,7 @@
 
 module;
 #include <Common.hpp>
+#include <simpleble/SimpleBLE.h>
 export module PortalSlot;
 
 import std;
@@ -30,7 +31,7 @@ public:
 
     void setState(PortalSlotState state) {m_state = state;}
     void readSkylanderDump(std::span<uint8_t> output);
-    void writeSkylanderDump(std::span<uint8_t> input);
+    void writeSkylanderDump(const SimpleBLE::ByteArray& input);
     [[nodiscard]] int getIndex() const {return m_index;}
     [[nodiscard]] PortalSlotState getState() const {return m_state;}
 
@@ -38,5 +39,5 @@ private:
 
     int m_index{};
     std::fstream m_skylanderDump{};
-    PortalSlotState m_state{PortalSlotState::LOADING};
+    std::atomic<PortalSlotState> m_state{PortalSlotState::LOADING};
 };

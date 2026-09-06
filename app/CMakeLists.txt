@@ -76,6 +76,7 @@ target_sources(SkylandersPortalEmulator
     PRIVATE
     src/Figure.cpp
     src/FigureLoader.cpp
+    src/Gate.cpp
     src/Main.cpp
     src/Owner.cpp
     src/PortalEmulator.cpp
@@ -85,7 +86,9 @@ target_sources(SkylandersPortalEmulator
     PRIVATE FILE_SET CXX_MODULES FILES
     src/Figure.cppm
     src/FigureLoader.cppm
-    src/Font.cppm src/Owner.cppm
+    src/Font.cppm
+    src/Gate.cppm
+    src/Owner.cppm
     src/PortalEmulator.cppm
     src/PortalSlot.cppm
     src/Texture.cppm
