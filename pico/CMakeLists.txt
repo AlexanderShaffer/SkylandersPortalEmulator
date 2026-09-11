@@ -14,38 +14,27 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-cmake_minimum_required(VERSION 4.2.3)
+cmake_minimum_required(VERSION 4.4.3)
 set(CMAKE_CXX_STANDARD 23)
-set(CMAKE_CXX_STANDARD_REQUIRED YES)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
 
-set(PICO_BOARD pico_w)
-include(FetchContent)
-
-# FetchContent_Populate() must be used instead of FetchContent_MakeAvailable() to avoid adding the PicoSDK to the build.
-FetchContent_Populate(PicoSdk
-    GIT_REPOSITORY https://github.com/raspberrypi/pico-sdk.git
-    GIT_TAG a1438dff1d38bd9c65dbd693f0e5db4b9ae91779 # Release 2.2.0
-    GIT_SUBMODULES_RECURSE FALSE
+file(
+    DOWNLOAD
+    https://raw.githubusercontent.com/raspberrypi/pico-sdk/079c6f39023649b154152db30f1d781e884879bc/external/pico_sdk_import.cmake
+    ${CMAKE_BINARY_DIR}/pico_sdk_import.cmake
 )
 
-include(${picosdk_SOURCE_DIR}/pico_sdk_init.cmake)
+set(PICO_SDK_FETCH_FROM_GIT ON)
+set(PICO_SDK_FETCH_FROM_GIT_TAG 079c6f39023649b154152db30f1d781e884879bc)
+set(PICO_BOARD pico_w)
+
+include(${CMAKE_BINARY_DIR}/pico_sdk_import.cmake)
 project(SkylandersPortalEmulator)
 pico_sdk_init()
 
-FetchContent_Declare(FreeRtos
-    GIT_REPOSITORY https://github.com/FreeRTOS/FreeRTOS-Kernel.git
-    GIT_TAG 0adc196d4bd52a2d91102b525b0aafc1e14a2386 # Release 11.2.0
-)
-
-add_library(freertos_config INTERFACE)
-target_include_directories(freertos_config SYSTEM INTERFACE config/)
-target_compile_definitions(freertos_config INTERFACE projCOVERAGE_TEST=0)
-set(FREERTOS_PORT "GCC_RP2040")
-FetchContent_MakeAvailable(FreeRtos)
-include(${FETCHCONTENT_BASE_DIR}/freertos-src/portable/ThirdParty/GCC/RP2040/FreeRTOS_Kernel_import.cmake)
-
-add_executable(SkylandersPortalEmulator config/UsbDescriptors.cpp src/Main.cpp)
+add_executable(SkylandersPortalEmulator src/Main.cpp src/UsbDescriptors.cpp)
 target_include_directories(SkylandersPortalEmulator PRIVATE config/ ../common/)
-target_link_libraries(SkylandersPortalEmulator PRIVATE pico_stdlib tinyusb_device tinyusb_board pico_cyw43_arch_lwip_sys_freertos FreeRTOS-Kernel-Heap4)
-target_compile_definitions(SkylandersPortalEmulator PRIVATE NO_SYS=0 WIFI_SSID=${WIFI_SSID} WIFI_PASSWORD=${WIFI_PASSWORD} HOST_IPV4_ADDRESS=${HOST_IPV4_ADDRESS})
+target_link_libraries(SkylandersPortalEmulator pico_stdlib pico_btstack_ble pico_btstack_cyw43 pico_cyw43_arch_none tinyusb_device tinyusb_board pico_multicore)
+pico_btstack_make_gatt_header(SkylandersPortalEmulator PRIVATE ${CMAKE_CURRENT_LIST_DIR}/config/server.gatt)
 pico_add_extra_outputs(SkylandersPortalEmulator)

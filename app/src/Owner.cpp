@@ -59,9 +59,13 @@ SdlOwner::SdlOwner()
 
 SdlOwner::~SdlOwner()
 {
+    SDL_Quit();
+}
+
+void SdlOwner::destroyContextAndWindow() const
+{
     SDL_GL_DestroyContext(m_glContext);
     SDL_DestroyWindow(m_window);
-    SDL_Quit();
 }
 
 ImGuiOwner::ImGuiOwner(const SdlOwner& sdlOwner)

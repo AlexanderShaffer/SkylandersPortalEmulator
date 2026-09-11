@@ -25,11 +25,12 @@ module PortalEmulator;
 PortalEmulator::PortalEmulator()
 {
     static constexpr SDL_AudioSpec AUDIO_SPEC{.format = SDL_AUDIO_S16LE, .channels = 1, .freq = 8000};
-
     m_audioStream = SDL_OpenAudioDeviceStream(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, &AUDIO_SPEC, nullptr, nullptr);
 
     if (m_audioStream)
         SDL_ResumeAudioStreamDevice(m_audioStream);
+    else
+        std::println(std::cerr, "Failed to initialize the audio device stream: {}", SDL_GetError());
 }
 
 PortalEmulator::~PortalEmulator()
@@ -66,7 +67,8 @@ bool PortalEmulator::requestUnload(const std::shared_ptr<PortalSlot>& portalSlot
         auto ref{std::ref(m_portalSlots[portalSlot->getIndex()])};
 
         portalSlot->setState(PortalSlotState::UNLOADING);
-        m_writeRequests.emplace(std::bind_front(&PortalEmulator::requestPlayableUnload, this, ref));
+        m_writeRequests.emplace(std::bind_front(&PortalEmulator::requestPlayableHalfUnload, this, ref, PacketType::UNLOAD_FIGURE_HALF_1));
+        m_writeRequests.emplace(std::bind_front(&PortalEmulator::requestPlayableHalfUnload, this, ref, PacketType::UNLOAD_FIGURE_HALF_2));
     }
 
     m_writeCondition.notify_all();
@@ -128,25 +130,51 @@ void PortalEmulator::scanForPico(const std::stop_token& token)
     adapter.scan_stop();
 }
 
+namespace
+{
+template<typename Item>
+Item* get(std::vector<Item>& items, const std::string_view uuid)
+{
+    for (Item& item : items)
+        if (item.uuid() == uuid)
+            return &item;
+
+    return nullptr;
+}
+} // namespace
+
 void PortalEmulator::validatePico()
 {
-    for (SimpleBLE::Service& service : m_pico.services())
-    {
-        if (service.uuid() != "facef73e-132f-4415-bd65-73a2123d70a2")
-            continue;
+    static constexpr std::size_t EXPECTED_SERVICE_COUNT{3};
+    std::vector services{m_pico.services()};
 
-        const std::vector characteristics{service.characteristics()};
+    if (services.size() != EXPECTED_SERVICE_COUNT)
+        return;
 
-        if (characteristics.size() != 1)
-            return;
+    SimpleBLE::Service* service{get(services, "facef73e-132f-4415-bd65-73a2123d70a2")};
 
-        if (SimpleBLE::Characteristic characteristic{characteristics.front()}; characteristic.uuid() == "022dcf96-388f-4531-99ef-1cf30449ac93" &&
-            characteristic.can_write_request() && characteristic.can_indicate() && characteristic.can_notify() && !characteristic.can_read() && !characteristic.can_write_command())
-        {
-            m_service = service;
-            m_characteristic = characteristic;
-        }
-    }
+    if (!service)
+        return;
+
+    static constexpr std::size_t EXPECTED_CHARACTERISTIC_COUNT{2};
+    std::vector characteristics{service->characteristics()};
+
+    if (characteristics.size() != EXPECTED_CHARACTERISTIC_COUNT)
+        return;
+
+    SimpleBLE::Characteristic* request{get(characteristics, "022dcf96-388f-4531-99ef-1cf30449ac93")};
+
+    if (!request || !request->can_write_request() || !request->can_indicate() || request->can_write_command() || request->can_read() || request->can_notify())
+        return;
+
+    SimpleBLE::Characteristic* music{get(characteristics, "d77f953a-932d-40d4-b4cd-7310bea9c201")};
+
+    if (!music || !music->can_write_command() || !music->can_notify() || music->can_indicate() || music->can_write_request() || music->can_read())
+        return;
+
+    m_service = *service;
+    m_requestCharacteristic = *request;
+    m_musicCharacteristic = *music;
 }
 
 void PortalEmulator::disconnectFromPico()
@@ -156,15 +184,16 @@ void PortalEmulator::disconnectFromPico()
         if (m_pico.initialized())
             m_pico.disconnect();
     }
-    catch (const SimpleBLE::Exception::BaseException& e)
+    catch (const std::exception& e)
     {
-        std::println(std::cerr, "A SimpleBLE exception occurred while disconnecting from the pico: {}", e.what());
+        std::println(std::cerr, "An exception occurred while disconnecting from the pico: {}", e.what());
     }
 
-    setConnectionStatus({.Message = "Disconnected", .Color = {0.1f, 1.0f, 0.0f, 1.0f}});
+    setConnectionStatus({.Message = "Disconnected", .Color = {1.0f, 1.0f, 0.0f, 1.0f}});
     m_pico = {};
     m_service = {};
-    m_characteristic = {};
+    m_requestCharacteristic = {};
+    m_musicCharacteristic = {};
 }
 
 void PortalEmulator::connectToPico(const std::stop_token& token)
@@ -175,15 +204,18 @@ void PortalEmulator::connectToPico(const std::stop_token& token)
     m_pico.connect();
     validatePico();
 
-    if (!m_service.initialized() || !m_characteristic.initialized())
+    if (!m_service.initialized() || !m_requestCharacteristic.initialized() || !m_musicCharacteristic.initialized())
         return;
 
-    m_pico.indicate(m_service.uuid(), m_characteristic.uuid(), std::bind_front(&PortalEmulator::respondToIndication, this));
-    m_pico.notify(m_service.uuid(), m_characteristic.uuid(), std::bind_front(&PortalEmulator::respondToNotification, this));
+    m_pico.indicate(m_service.uuid(), m_requestCharacteristic.uuid(), std::bind_front(&PortalEmulator::respondToIndication, this));
+    m_pico.notify(m_service.uuid(), m_musicCharacteristic.uuid(), std::bind_front(&PortalEmulator::respondToMusicNotification, this));
     std::jthread writeRequester{std::bind_front(&PortalEmulator::runWriteRequester, this)};
+    std::jthread queuedAudioBytesSender{std::bind_front(&PortalEmulator::runQueuedAudioBytesSender, this)};
 
     setConnectionStatus({.Message = "Connected", .Color = {0.0f, 1.0f, 0.0f, 1.0f}, .Connected = true});
     m_disconnectionGate.enterThroughAsSoonAsPossible(token);
+    m_pico.unsubscribe(m_service.uuid(), m_musicCharacteristic.uuid());
+    m_pico.unsubscribe(m_service.uuid(), m_requestCharacteristic.uuid());
 }
 
 void PortalEmulator::runBluetoothThread(const std::stop_token& token)
@@ -207,37 +239,58 @@ void PortalEmulator::runBluetoothThread(const std::stop_token& token)
 
             connectToPico(token);
         }
-        catch (const SimpleBLE::Exception::BaseException& e)
+        catch (const std::exception& e)
         {
-            std::println(std::cerr, "A SimpleBLE exception occurred in the Bluetooth thread: {}", e.what());
+            std::println(std::cerr, "An exception occurred in the Bluetooth thread: {}", e.what());
         }
     }
 
     disconnectFromPico();
 }
 
-bool PortalEmulator::requestPlayableLoad(const std::shared_ptr<PortalSlot>& portalSlot)
+bool PortalEmulator::requestPlayableHalfLoad(const std::shared_ptr<PortalSlot>& portalSlot, const PacketType packetType, const std::stop_token& token)
 {
-    std::array<uint8_t, sizeof(PacketType) + sizeof(uint8_t) + FIGURE_DUMP_SIZE> packet;
+    if (token.stop_requested())
+        return true;
+
+    std::array<uint8_t, sizeof(PacketType) + sizeof(uint8_t) + FIGURE_HALF_DUMP_SIZE> packet;
     auto* pos = packet.data();
 
-    *pos++ = PacketType::LOAD_FIGURE;
-    *pos++ = static_cast<uint8_t>(portalSlot->getIndex());
-    portalSlot->readSkylanderDump({pos, FIGURE_DUMP_SIZE});
+    *pos++ = packetType;
 
-    return writeRequest(packet);
+    {
+        std::lock_guard lock{m_mutex};
+
+        *pos++ = static_cast<uint8_t>(portalSlot->getIndex());
+        portalSlot->readSkylanderDump(packetType == PacketType::LOAD_FIGURE_HALF_1 ? 0 : FIGURE_HALF_DUMP_SIZE, {pos, FIGURE_HALF_DUMP_SIZE});
+    }
+
+    m_indicationGate.closeIfNotAlready();
+
+    if (!writeRequest(packet))
+        return false;
+
+    m_indicationGate.enterThroughAsSoonAsPossible(token);
+    return true;
 }
 
-bool PortalEmulator::requestPlayableUnload(std::shared_ptr<PortalSlot>& portalSlot)
+bool PortalEmulator::requestPlayableLoad(const std::shared_ptr<PortalSlot>& portalSlot, const std::stop_token& token)
 {
-    if (portalSlot->getState() == PortalSlotState::UNLOADED)
+    return requestPlayableHalfLoad(portalSlot, PacketType::LOAD_FIGURE_HALF_1, token) && requestPlayableHalfLoad(portalSlot, PacketType::LOAD_FIGURE_HALF_2, token);
+}
+
+bool PortalEmulator::requestPlayableHalfUnload(std::shared_ptr<PortalSlot>& portalSlot, const PacketType packetType, const std::stop_token& /* token */)
+{
+    std::unique_lock lock{m_mutex};
+
+    if (!portalSlot)
     {
-        portalSlot = nullptr;
         popWriteRequest();
         return true;
     }
 
-    std::array<uint8_t, sizeof(PacketType) + sizeof(uint8_t)> packet{PacketType::UNLOAD_FIGURE, static_cast<uint8_t>(portalSlot->getIndex())};
+    std::array packet{static_cast<uint8_t>(packetType), static_cast<uint8_t>(portalSlot->getIndex())};
+    lock.unlock();
     return writeRequest(packet);
 }
 
@@ -245,13 +298,25 @@ bool PortalEmulator::writeRequest(const std::span<uint8_t> packet)
 {
     try
     {
-        m_pico.write_request(m_service.uuid(), m_characteristic.uuid(), {packet.data(), packet.size()});
+        m_pico.write_request(m_service.uuid(), m_requestCharacteristic.uuid(), {packet.data(), packet.size()});
         return true;
     }
-    catch (const SimpleBLE::Exception::BaseException& e)
+    catch (const std::exception& e)
     {
-        std::println(std::cerr, "A SimpleBLE exception occurred while performing a write request: {}", e.what());
+        std::println(std::cerr, "An exception occurred while performing a write request: {}", e.what());
         return false;
+    }
+}
+
+void PortalEmulator::writeCommand(const std::int32_t data)
+{
+    try
+    {
+        m_pico.write_command(m_service.uuid(), m_musicCharacteristic.uuid(), {reinterpret_cast<const std::uint8_t*>(&data), sizeof(data)});
+    }
+    catch (const std::exception& e)
+    {
+        std::println(std::cerr, "An exception occurred while performing a write request: {}", e.what());
     }
 }
 
@@ -264,12 +329,13 @@ void PortalEmulator::popWriteRequest()
 void PortalEmulator::respondToIndication(const SimpleBLE::ByteArray& packet)
 {
     std::lock_guard lock{m_mutex};
+    const std::uint8_t type{packet[0]};
 
-    if (packet[0] == PacketType::VALIDATE_PORTAL_SLOTS)
+    if (type == PacketType::VALIDATE_PORTAL_SLOTS)
     {
         for (int i = 0; i < m_portalSlots.size(); i++)
         {
-            const auto& portalSlot{m_portalSlots[i]};
+            auto& portalSlot{m_portalSlots[i]};
             const auto appSlotState{portalSlot ? portalSlot->getState() : PortalSlotState::UNLOADED};
             const auto picoSlotLoaded{static_cast<bool>(packet[1 + i])};
 
@@ -279,10 +345,17 @@ void PortalEmulator::respondToIndication(const SimpleBLE::ByteArray& packet)
                 m_writeRequests.emplace(std::bind_front(&PortalEmulator::requestPlayableLoad, this, std::cref(portalSlot)));
             }
             else if (appSlotState == PortalSlotState::UNLOADING && !picoSlotLoaded)
+            {
                 portalSlot->setState(PortalSlotState::UNLOADED);
+                portalSlot = nullptr;
+            }
         }
+
+        m_indicationGate.openIfNotAlready();
+        return;
     }
-    else if (packet[0] == PacketType::LOAD_FIGURE)
+
+    if (type == PacketType::LOAD_FIGURE_HALF_2)
     {
         const auto portalSlotIndex{packet[1]};
         const auto& portalSlot{m_portalSlots[portalSlotIndex]};
@@ -292,52 +365,113 @@ void PortalEmulator::respondToIndication(const SimpleBLE::ByteArray& packet)
 
         portalSlot->setState(PortalSlotState::LOADED);
     }
-    else if (packet[0] == PacketType::UNLOAD_FIGURE)
+    else if (type == PacketType::UNLOAD_FIGURE_HALF_1 || type == PacketType::UNLOAD_FIGURE_HALF_2)
     {
         const auto portalSlotIndex{packet[1]};
         auto& portalSlot{m_portalSlots[portalSlotIndex]};
 
-        if(portalSlot->getState() != PortalSlotState::UNLOADING)
-            std::println(std::cerr, "The portal slot should be in the UNLOADING state before transitioning to the UNLOADED state");
+        if (type == UNLOAD_FIGURE_HALF_1)
+            std::copy_n(packet.data() + 2, FIGURE_HALF_DUMP_SIZE, m_unloadingFigureDump.begin());
+        else
+        {
+            std::copy_n(packet.data() + 2, FIGURE_HALF_DUMP_SIZE, m_unloadingFigureDump.begin() + FIGURE_HALF_DUMP_SIZE);
 
-        portalSlot->writeSkylanderDump(packet.slice_from(2));
-        portalSlot->setState(PortalSlotState::UNLOADED);
-        portalSlot = nullptr;
+            if(portalSlot->getState() != PortalSlotState::UNLOADING)
+                std::println(std::cerr, "The portal slot should be in the UNLOADING state before transitioning to the UNLOADED state");
+
+            portalSlot->writeSkylanderDump(m_unloadingFigureDump);
+            portalSlot->setState(PortalSlotState::UNLOADED);
+            portalSlot = nullptr;
+        }
     }
     else
     {
-        std::println(std::cerr, "Unknown packet type received: {}", packet[0]);
+        if (type == PacketType::LOAD_FIGURE_HALF_1)
+            m_indicationGate.openIfNotAlready();
+        else
+            std::println(std::cerr, "Unknown packet type received: {}", packet[0]);
+
         return;
     }
 
     popWriteRequest();
 }
 
-void PortalEmulator::respondToNotification(const SimpleBLE::ByteArray& packet) const
+namespace
+{
+std::int32_t toLittleEndian(const std::int32_t value)
+{
+    static_assert(std::endian::native == std::endian::little || std::endian::native == std::endian::big);
+
+    if constexpr (std::endian::native == std::endian::little)
+        return value;
+    else
+        return std::byteswap(value);
+}
+} // namespace
+
+void PortalEmulator::runQueuedAudioBytesSender(const std::stop_token& token)
+{
+    if (!m_audioStream)
+        return;
+
+    while (!token.stop_requested())
+    {
+        m_musicGate.closeIfNotAlready();
+        m_musicGate.enterThroughAsSoonAsPossible(token);
+
+        if (token.stop_requested())
+            return;
+
+        static constexpr std::chrono::milliseconds MUSIC_TIMEOUT{500};
+
+        while (!token.stop_requested() && std::chrono::system_clock::now() - m_timeDuringLastMusicReceived.load() < MUSIC_TIMEOUT)
+        {
+            if (const std::int32_t bytesQueued{SDL_GetAudioStreamQueued(m_audioStream)}; bytesQueued >= 0)
+                writeCommand(toLittleEndian(bytesQueued));
+
+            static constexpr std::chrono::milliseconds SEND_INTERVAL{100};
+            std::this_thread::sleep_for(SEND_INTERVAL);
+        }
+    }
+}
+
+void PortalEmulator::respondToMusicNotification(const SimpleBLE::ByteArray& packet)
 {
     if (!m_audioStream)
         return;
 
     if (!SDL_PutAudioStreamData(m_audioStream, packet.data(), static_cast<int>(packet.size())))
         std::println(std::cerr, "Failed to put audio stream data: {}", SDL_GetError());
+
+    m_timeDuringLastMusicReceived = std::chrono::system_clock::now();
+    m_musicGate.openIfNotAlready();
 }
 
-bool PortalEmulator::validatePortalSlots()
+bool PortalEmulator::validatePortalSlots(const std::stop_token& token)
 {
-    std::lock_guard lock{m_mutex};
     std::array<uint8_t, sizeof(PacketType) + PORTAL_SLOT_COUNT> packet;
-
     packet[0] = PacketType::VALIDATE_PORTAL_SLOTS;
 
-    for (int i = 0; i < m_portalSlots.size(); i++)
-        packet[1 + i] = static_cast<uint8_t>(m_portalSlots[i] ? m_portalSlots[i]->getState() : PortalSlotState::UNLOADED);
+    {
+        std::lock_guard lock{m_mutex};
 
-    return writeRequest(packet);
+        for (int i = 0; i < m_portalSlots.size(); i++)
+            packet[1 + i] = static_cast<uint8_t>(m_portalSlots[i] ? m_portalSlots[i]->getState() : PortalSlotState::UNLOADED);
+    }
+
+    m_indicationGate.closeIfNotAlready();
+
+    if (!writeRequest(packet))
+        return false;
+
+    m_indicationGate.enterThroughAsSoonAsPossible(token);
+    return true;
 }
 
 void PortalEmulator::runWriteRequester(const std::stop_token& token)
 {
-    if (!validatePortalSlots())
+    if (!validatePortalSlots(token))
     {
         m_disconnectionGate.openIfNotAlready();
         return;
@@ -352,13 +486,13 @@ void PortalEmulator::runWriteRequester(const std::stop_token& token)
             break;
 
         const auto& request{m_writeRequests.front()};
+        lock.unlock();
 
         m_indicationGate.closeIfNotAlready();
 
-        if (!request())
+        if (!request(token))
             break;
 
-        lock.unlock();
         m_indicationGate.enterThroughAsSoonAsPossible(token);
     }
 

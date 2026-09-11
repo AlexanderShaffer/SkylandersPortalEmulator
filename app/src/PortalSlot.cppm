@@ -30,8 +30,8 @@ public:
     explicit PortalSlot(int index, const std::filesystem::path& figureDumpPath);
 
     void setState(PortalSlotState state) {m_state = state;}
-    void readSkylanderDump(std::span<uint8_t> output);
-    void writeSkylanderDump(const SimpleBLE::ByteArray& input);
+    void readSkylanderDump(std::size_t offset, std::span<std::uint8_t> output);
+    void writeSkylanderDump(std::span<std::uint8_t> input);
     [[nodiscard]] int getIndex() const {return m_index;}
     [[nodiscard]] PortalSlotState getState() const {return m_state;}
 

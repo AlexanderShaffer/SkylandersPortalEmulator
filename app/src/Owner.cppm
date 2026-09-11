@@ -33,6 +33,7 @@ public:
     SdlOwner& operator=(const SdlOwner&) = delete;
     SdlOwner& operator=(SdlOwner&&) noexcept = delete;
 
+    void destroyContextAndWindow() const;
     [[nodiscard]] SDL_Window* getWindow() const {return m_window;}
     [[nodiscard]] SDL_GLContext getGlContext() const {return m_glContext;}
     [[nodiscard]] float getScale() const {return m_scale;}

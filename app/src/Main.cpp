@@ -26,8 +26,8 @@ import FigureLoader;
 
 int main()
 {
-    PortalEmulator portalEmulator{};
     const SdlOwner sdlOwner{};
+    PortalEmulator portalEmulator{};
     auto* const window{sdlOwner.getWindow()};
     const ImGuiOwner imGuiOwner{sdlOwner};
     const ImVec2 maxItemSpacing{ImGui::GetStyle().ItemSpacing};
@@ -92,5 +92,6 @@ int main()
         SDL_GL_SwapWindow(window);
     }
 
+    sdlOwner.destroyContextAndWindow();
     return 0;
 }

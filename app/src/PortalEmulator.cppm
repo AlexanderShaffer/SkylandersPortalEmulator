@@ -61,28 +61,35 @@ private:
     void disconnectFromPico();
     void connectToPico(const std::stop_token& token);
     void runBluetoothThread(const std::stop_token& token);
-    [[nodiscard]] bool requestPlayableLoad(const std::shared_ptr<PortalSlot>& portalSlot);
-    [[nodiscard]] bool requestPlayableUnload(std::shared_ptr<PortalSlot>& portalSlot);
+    [[nodiscard]] bool requestPlayableHalfLoad(const std::shared_ptr<PortalSlot>& portalSlot, PacketType packetType, const std::stop_token& token);
+    [[nodiscard]] bool requestPlayableLoad(const std::shared_ptr<PortalSlot>& portalSlot, const std::stop_token& token);
+    [[nodiscard]] bool requestPlayableHalfUnload(std::shared_ptr<PortalSlot>& portalSlot, PacketType packetType, const std::stop_token& /* token */);
     [[nodiscard]] bool writeRequest(std::span<uint8_t> packet);
+    void writeCommand(std::int32_t data);
     void popWriteRequest();
     void respondToIndication(const SimpleBLE::ByteArray&);
-    void respondToNotification(const SimpleBLE::ByteArray&) const;
-    bool validatePortalSlots();
+    void runQueuedAudioBytesSender(const std::stop_token& token);
+    void respondToMusicNotification(const SimpleBLE::ByteArray&);
+    bool validatePortalSlots(const std::stop_token& token);
     void runWriteRequester(const std::stop_token& token);
     void setConnectionStatus(const ConnectionStatus& connectionStatus);
 
 private:
 
     std::array<std::shared_ptr<PortalSlot>, PORTAL_SLOT_COUNT> m_portalSlots{};
+    std::array<std::uint8_t, FIGURE_DUMP_SIZE> m_unloadingFigureDump;
     Gate m_disconnectionGate{};
     Gate m_indicationGate{};
+    Gate m_musicGate{};
     std::condition_variable_any m_writeCondition{};
     std::mutex m_mutex{};
-    std::queue<std::function<bool()>> m_writeRequests{};
+    std::queue<std::function<bool(const std::stop_token&)>> m_writeRequests{};
     ConnectionStatus m_connectionStatus{};
     SimpleBLE::Peripheral m_pico{};
     SimpleBLE::Service m_service{};
-    SimpleBLE::Characteristic m_characteristic{};
+    SimpleBLE::Characteristic m_requestCharacteristic{};
+    SimpleBLE::Characteristic m_musicCharacteristic{};
+    std::atomic<std::chrono::time_point<std::chrono::system_clock>> m_timeDuringLastMusicReceived{};
     SDL_AudioStream* m_audioStream{};
 
     std::jthread m_networkThread{std::bind_front(&PortalEmulator::runBluetoothThread, this)};

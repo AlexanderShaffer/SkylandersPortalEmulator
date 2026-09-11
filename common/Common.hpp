@@ -22,8 +22,10 @@
 enum PacketType : char
 {
     VALIDATE_PORTAL_SLOTS,
-    LOAD_FIGURE,
-    UNLOAD_FIGURE
+    LOAD_FIGURE_HALF_1,
+    LOAD_FIGURE_HALF_2,
+    UNLOAD_FIGURE_HALF_1,
+    UNLOAD_FIGURE_HALF_2
 };
 
 enum class PortalSlotState : char
@@ -34,10 +36,7 @@ enum class PortalSlotState : char
     UNLOADED
 };
 
-constexpr inline int TCP_PORT{4242};
-constexpr inline int UDP_PORT{8282};
-constexpr inline uint32_t CONNECTION_TIMEOUT_MS{10000};
 constexpr inline int PORTAL_SLOT_COUNT{16};
 constexpr inline int FIGURE_DUMP_SIZE{1024};
-constexpr inline uint64_t MUSIC_DATAGRAM_SIZE{32};
-constexpr inline int MAX_PACKET_SIZE{2 * sizeof(uint8_t) + sizeof(PacketType) + sizeof(uint8_t) + FIGURE_DUMP_SIZE};
+constexpr inline int FIGURE_HALF_DUMP_SIZE{FIGURE_DUMP_SIZE / 2};
+constexpr inline int MAX_PACKET_SIZE{sizeof(PacketType) + sizeof(uint8_t) + FIGURE_HALF_DUMP_SIZE};

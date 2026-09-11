@@ -1,0 +1,25 @@
+// This file is part of Skylanders Portal Emulator.
+// Copyright (C) 2026  Alexander Shaffer <alexander.shaffer.623@gmail.com>
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+PRIMARY_SERVICE, GAP_SERVICE
+CHARACTERISTIC, GAP_DEVICE_NAME, READ, "Skylanders Portal Emulator"
+
+PRIMARY_SERVICE, GATT_SERVICE
+CHARACTERISTIC, GATT_DATABASE_HASH, READ,
+
+PRIMARY_SERVICE, facef73e-132f-4415-bd65-73a2123d70a2
+CHARACTERISTIC, 022dcf96-388f-4531-99ef-1cf30449ac93, DYNAMIC | WRITE | INDICATE,
+CHARACTERISTIC, d77f953a-932d-40d4-b4cd-7310bea9c201, DYNAMIC | WRITE_WITHOUT_RESPONSE | NOTIFY,

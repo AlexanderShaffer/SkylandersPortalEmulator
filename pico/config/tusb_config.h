@@ -1,7 +1,6 @@
 /*
- * This file was a copy of https://github.com/raspberrypi/pico-examples/blob/master/usb/device/dev_hid_composite/tusb_config.h.
- * Besides the addition of this comment and the copyright notice below, all changes made to this file after copying are documented with comments starting with "CHANGE:".
- * Date copied: 1/20/2026
+ * This file is a copy of https://github.com/raspberrypi/pico-examples/blob/7fe60d6b4027771e45d97f207532c41b1d8c5418/usb/device/dev_hid_composite/tusb_config.h.
+ * Besides the addition of this comment and the copyright notice below, all changes made to this file after copying are documented with comments starting with "CHANGE."
  */
 
 /*
@@ -127,7 +126,7 @@
 #define CFG_TUD_MIDI              0
 #define CFG_TUD_VENDOR            0
 
-// CHANGE: Set CFG_TUD_HID_EP_BUFSIZE from 16 to 32 because Skylanders Portals can send/receive USB packets containing at most 32 bytes
+// CHANGE: Set CFG_TUD_HID_EP_BUFSIZE from 16 to 32 because Skylanders Portals can send/receive USB packets containing at most 32 bytes.
 // HID buffer size Should be sufficient to hold ID (if any) + Data
 #define CFG_TUD_HID_EP_BUFSIZE    32
 
