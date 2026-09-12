@@ -282,10 +282,18 @@ void requestToSendMusicNotification(void* context)
     att_server_request_to_send_notification(&notificationCallback, connectionHandle);
 }
 
-void handleMusicPacket(const uint8_t* buffer)
+void handleMusicPacket(const uint8_t* const buffer, const absolute_time_t timeSinceLastMusic)
 {
-    static std::array<uint8_t, MUSIC_NOTIFICATION_SIZE> musicData;
+    static constexpr absolute_time_t AUDIO_ENDED_THRESHOLD{50000};
     static size_t musicDataIndex{0};
+
+    if (timeSinceLastMusic > AUDIO_ENDED_THRESHOLD)
+    {
+        queuedAudioBytes = 0;
+        musicDataIndex = 0;
+    }
+
+    static std::array<uint8_t, MUSIC_NOTIFICATION_SIZE> musicData;
 
     std::copy_n(buffer, MUSIC_PACKET_SIZE, musicData.begin() + musicDataIndex);
     musicDataIndex += MUSIC_PACKET_SIZE;
@@ -323,10 +331,10 @@ void tud_hid_set_report_cb(uint8_t instance, uint8_t report_id, hid_report_type_
     static absolute_time_t timeDuringLastMusic{};
     static constexpr absolute_time_t AUDIO_TIMEOUT{500000};
 
-    if (get_absolute_time() - timeDuringLastMusic < AUDIO_TIMEOUT && bufsize == MUSIC_PACKET_SIZE)
+    if (const absolute_time_t timeSinceLastMusic{get_absolute_time() - timeDuringLastMusic}; timeSinceLastMusic < AUDIO_TIMEOUT && bufsize == MUSIC_PACKET_SIZE)
     {
         if (connected)
-            handleMusicPacket(buffer);
+            handleMusicPacket(buffer, timeSinceLastMusic);
 
         timeDuringLastMusic = get_absolute_time();
         return;
@@ -353,7 +361,6 @@ void tud_hid_set_report_cb(uint8_t instance, uint8_t report_id, hid_report_type_
         const Message message{'M', buffer[1], 0x00, 0x19};
         tud_hid_report(0, message.data(), message.size());
         timeDuringLastMusic = get_absolute_time();
-        queuedAudioBytes = 0;
     }
     else if (buffer[0] == 'Q')
         handleDumpMessage({buffer, bufsize}, handleQueryMessage);

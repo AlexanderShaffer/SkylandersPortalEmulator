@@ -423,7 +423,12 @@ void PortalEmulator::runQueuedAudioBytesSender(const std::stop_token& token)
         if (token.stop_requested())
             return;
 
-        static constexpr std::chrono::milliseconds MUSIC_TIMEOUT{500};
+        static constexpr std::array<std::uint8_t, 1024 * 4> SILENT_AUDIO{};
+
+        SDL_ClearAudioStream(m_audioStream);
+        SDL_PutAudioStreamData(m_audioStream, SILENT_AUDIO.data(), SILENT_AUDIO.size());
+
+        static constexpr std::chrono::milliseconds MUSIC_TIMEOUT{250};
 
         while (!token.stop_requested() && std::chrono::system_clock::now() - m_timeDuringLastMusicReceived.load() < MUSIC_TIMEOUT)
         {
