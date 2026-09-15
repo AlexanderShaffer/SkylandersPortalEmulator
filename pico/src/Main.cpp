@@ -42,28 +42,31 @@ struct PortalSlot
 {
     std::atomic_bool Loaded{false};
     std::array<uint8_t, FIGURE_DUMP_SIZE> SkylanderDump;
-    uint8_t Timer{0};
+    std::atomic_uint8_t Timer{0};
 };
 
+constexpr uint8_t MIN_TIMER_VALUE{0};
+constexpr uint8_t MAX_TIMER_VALUE{15};
 constexpr uint16_t MUSIC_PACKET_SIZE{32};
 constexpr size_t MUSIC_NOTIFICATION_SIZE{MUSIC_PACKET_SIZE * 16};
 std::array<PortalSlot, PORTAL_SLOT_COUNT> portalSlots;
-bool ready{false};
 std::atomic_bool connected{false};
 std::atomic_int32_t queuedAudioBytes{0};
 hci_con_handle_t connectionHandle{0};
 
 void handleDumpMessage(const std::span<const uint8_t> dumpMessage, void(* const operation)(std::span<const uint8_t>, std::span<uint8_t> response, std::span<uint8_t>, int))
 {
-    constexpr auto INDEX_BIT_MASK{0b00001111};
-    constexpr auto BLOCK_SIZE{16};
+    static constexpr int INDEX_BIT_MASK{0x0F};
+    static constexpr int BLOCK_SIZE{16};
+    static constexpr int SUCCESS_BITS{0x10};
 
-    auto& skylanderDump{portalSlots[dumpMessage[1] & INDEX_BIT_MASK].SkylanderDump};
-    const auto blockIndex{dumpMessage[2]};
-    const auto pos{blockIndex * BLOCK_SIZE};
+    const std::span skylanderDump{portalSlots[dumpMessage[1] & INDEX_BIT_MASK].SkylanderDump};
+    const uint8_t blockIndex{dumpMessage[2]};
+    const int pos{blockIndex * BLOCK_SIZE};
 
     Message response{};
     std::copy_n(dumpMessage.data(), 3, response.data());
+    response[1] = (response[1] & INDEX_BIT_MASK) | SUCCESS_BITS;
 
     operation(dumpMessage, response, skylanderDump, pos);
     tud_hid_report(0, response.data(), response.size());
@@ -88,6 +91,7 @@ void indicate(const std::span<uint8_t> packet)
 
 void respondToApp(void* context)
 {
+    static constexpr uint32_t SLOT_STATE_CHANGE_DELAY{500};
     uint8_t* const packet{static_cast<uint8_t*>(context)};
     const uint8_t type = packet[0];
 
@@ -116,7 +120,9 @@ void respondToApp(void* context)
         else
         {
             std::copy_n(packet + 2, FIGURE_HALF_DUMP_SIZE, portalSlot.SkylanderDump.data() + FIGURE_HALF_DUMP_SIZE);
+            portalSlot.Timer = MIN_TIMER_VALUE;
             portalSlot.Loaded = true;
+            busy_wait_ms(SLOT_STATE_CHANGE_DELAY);
         }
 
         indicate(std::span{packet, 2});
@@ -128,8 +134,9 @@ void respondToApp(void* context)
 
         if (type == PacketType::UNLOAD_FIGURE_HALF_1)
         {
+            portalSlot.Timer = MAX_TIMER_VALUE;
             portalSlot.Loaded = false;
-            busy_wait_ms(200);
+            busy_wait_ms(SLOT_STATE_CHANGE_DELAY);
             std::copy_n(portalSlot.SkylanderDump.data(), FIGURE_HALF_DUMP_SIZE, packet + 2);
         }
         else
@@ -210,14 +217,14 @@ void initGattServer()
     gap_advertisements_enable(true);
 }
 
-void sendStatusMessage()
+void sendStatusMessage(bool shouldSend)
 {
-    static std::array<uint8_t, 32> statusMessage{'S', 0x00, 0x00, 0x00, 0x00, 0x00, 0x01};
+    static uint8_t statusId{0};
+    std::array<uint8_t, 32> statusMessage{'S', 0x00, 0x00, 0x00, 0x00, 0x00, 0x01};
 
     for (int portalSlotIndex{0}; portalSlotIndex < portalSlots.size(); portalSlotIndex++)
     {
-        static constexpr uint8_t MIN_TIMER_VALUE{0};
-        static constexpr uint8_t MAX_TIMER_VALUE{10};
+        static constexpr uint8_t FINAL_STATE_TIMER_OFFSET{5};
         static constexpr uint8_t LOADING_SKYLANDER{0b11};
         static constexpr uint8_t SKYLANDER_LOADED{0b01};
         static constexpr uint8_t REMOVING_SKYLANDER{0b10};
@@ -227,9 +234,9 @@ void sendStatusMessage()
         uint8_t slotState;
 
         if (portalSlot.Loaded)
-            slotState = portalSlot.Timer == MAX_TIMER_VALUE ? SKYLANDER_LOADED : LOADING_SKYLANDER;
+            slotState = portalSlot.Timer >= MAX_TIMER_VALUE - FINAL_STATE_TIMER_OFFSET ? SKYLANDER_LOADED : LOADING_SKYLANDER;
         else
-            slotState = portalSlot.Timer == MIN_TIMER_VALUE ? NO_SKYLANDER : REMOVING_SKYLANDER;
+            slotState = portalSlot.Timer <= MIN_TIMER_VALUE + FINAL_STATE_TIMER_OFFSET ? NO_SKYLANDER : REMOVING_SKYLANDER;
 
         static constexpr int SKYLANDERS_PER_BYTE{4};
         static constexpr int SKYLANDER_SIZE_BITS{2};
@@ -238,6 +245,7 @@ void sendStatusMessage()
         auto& byte{statusMessage[1 + portalSlotIndex / SKYLANDERS_PER_BYTE]};
 
         byte = (byte & bitMask) | (slotState << bitIndex);
+        shouldSend |= portalSlot.Timer != MIN_TIMER_VALUE && portalSlot.Timer != MAX_TIMER_VALUE;
 
         if (portalSlot.Loaded)
             portalSlot.Timer = std::min(MAX_TIMER_VALUE, static_cast<uint8_t>(portalSlot.Timer + 1));
@@ -245,8 +253,11 @@ void sendStatusMessage()
             portalSlot.Timer = portalSlot.Timer == MIN_TIMER_VALUE ? MIN_TIMER_VALUE : portalSlot.Timer - 1;
     }
 
-    statusMessage[5]++;
-    tud_hid_report(0, statusMessage.data(), statusMessage.size());
+    if (shouldSend)
+    {
+        statusMessage[5] = statusId++;
+        tud_hid_report(0, statusMessage.data(), statusMessage.size());
+    }
 }
 
 void handleUsb()
@@ -263,9 +274,9 @@ void handleUsb()
 
         const auto now{get_absolute_time()};
 
-        if (constexpr absolute_time_t STATUS_DELAY_US{25000}; ready && now - timeDuringLastStatus > STATUS_DELAY_US)
+        if (constexpr absolute_time_t STATUS_DELAY_US{25000}; now - timeDuringLastStatus > STATUS_DELAY_US)
         {
-            sendStatusMessage();
+            sendStatusMessage(false);
             timeDuringLastStatus = now;
         }
     }
@@ -349,7 +360,6 @@ void tud_hid_set_report_cb(uint8_t instance, uint8_t report_id, hid_report_type_
     {
         constexpr Message message{'R', 0x02, 0x18};
         tud_hid_report(0, message.data(), message.size());
-        ready = true;
     }
     else if (buffer[0] == 'J')
     {
@@ -366,6 +376,8 @@ void tud_hid_set_report_cb(uint8_t instance, uint8_t report_id, hid_report_type_
         handleDumpMessage({buffer, bufsize}, handleQueryMessage);
     else if (buffer[0] == 'W')
         handleDumpMessage({buffer, bufsize}, handleWriteMessage);
+    else if (buffer[0] == 'S')
+        sendStatusMessage(true);
 }
 
 int main()
