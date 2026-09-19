@@ -58,7 +58,7 @@ private:
 
     void scanForPico(const std::stop_token& token);
     void validatePico();
-    void disconnectFromPico();
+    void disconnectFromPico(const std::stop_token& token, std::string_view message);
     void connectToPico(const std::stop_token& token);
     void runBluetoothThread(const std::stop_token& token);
     [[nodiscard]] bool requestPlayableHalfLoad(const std::shared_ptr<PortalSlot>& portalSlot, PacketType packetType, const std::stop_token& token);

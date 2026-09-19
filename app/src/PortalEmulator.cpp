@@ -177,7 +177,18 @@ void PortalEmulator::validatePico()
     m_musicCharacteristic = *music;
 }
 
-void PortalEmulator::disconnectFromPico()
+namespace
+{
+void sleep(const std::stop_token& token, const std::chrono::milliseconds duration)
+{
+    std::condition_variable_any stopCondition{};
+    std::mutex mutex{};
+    std::unique_lock lock{mutex};
+    stopCondition.wait_for(lock, token, duration, []{return false;});
+}
+} // namespace
+
+void PortalEmulator::disconnectFromPico(const std::stop_token& token, const std::string_view message)
 {
     try
     {
@@ -189,7 +200,12 @@ void PortalEmulator::disconnectFromPico()
         std::println(std::cerr, "An exception occurred while disconnecting from the pico: {}", e.what());
     }
 
-    setConnectionStatus({.Message = "Disconnected", .Color = {1.0f, 1.0f, 0.0f, 1.0f}});
+    if (m_pico.initialized())
+    {
+        setConnectionStatus({.Message = message, .Color = {1.0f, 0.5f, 0.0f, 1.0f}});
+        sleep(token, std::chrono::milliseconds{5000});
+    }
+
     m_pico = {};
     m_service = {};
     m_requestCharacteristic = {};
@@ -205,7 +221,10 @@ void PortalEmulator::connectToPico(const std::stop_token& token)
     validatePico();
 
     if (!m_service.initialized() || !m_requestCharacteristic.initialized() || !m_musicCharacteristic.initialized())
+    {
+        disconnectFromPico(token, "Disconnected - The Pico W's software version is incompatible");
         return;
+    }
 
     m_pico.indicate(m_service.uuid(), m_requestCharacteristic.uuid(), std::bind_front(&PortalEmulator::respondToIndication, this));
     m_pico.notify(m_service.uuid(), m_musicCharacteristic.uuid(), std::bind_front(&PortalEmulator::respondToMusicNotification, this));
@@ -224,16 +243,12 @@ void PortalEmulator::runBluetoothThread(const std::stop_token& token)
     {
         try
         {
-            disconnectFromPico();
+            disconnectFromPico(token, "Disconnected - Ensure the Pico W has a clear line of sight to this device");
             scanForPico(token);
 
             if (!m_pico.initialized())
             {
-                constexpr auto WAIT_INTERVAL{std::chrono::milliseconds(1000)};
-                std::condition_variable_any stopCondition{};
-                std::mutex mutex{};
-                std::unique_lock lock{mutex};
-                stopCondition.wait_for(lock, token, WAIT_INTERVAL, []{return false;});
+                sleep(token, std::chrono::milliseconds{1000});
                 continue;
             }
 
@@ -245,7 +260,7 @@ void PortalEmulator::runBluetoothThread(const std::stop_token& token)
         }
     }
 
-    disconnectFromPico();
+    disconnectFromPico(token, "Disconnected - Stop requested");
 }
 
 bool PortalEmulator::requestPlayableHalfLoad(const std::shared_ptr<PortalSlot>& portalSlot, const PacketType packetType, const std::stop_token& token)
