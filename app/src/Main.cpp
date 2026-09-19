@@ -33,19 +33,19 @@ int main()
     const ImVec2 maxItemSpacing{ImGui::GetStyle().ItemSpacing};
     const auto& io{ImGui::GetIO()};
     bool running{true};
-    bool fullscreen{true};
     FigureLoader figureLoader{};
 
     while (running)
     {
         SDL_Event event;
+        const bool fullscreen{static_cast<bool>(SDL_GetWindowFlags(window) & SDL_WINDOW_FULLSCREEN)};
 
         while (SDL_PollEvent(&event))
         {
             if (event.type == SDL_EVENT_MOUSE_WHEEL)
                 event.wheel.y *= 0.3f;
             else if (event.type == SDL_EVENT_KEY_DOWN && event.key.key == SDLK_F11)
-                SDL_SetWindowFullscreen(window, fullscreen = !fullscreen);
+                SDL_SetWindowFullscreen(window, !fullscreen);
 
             ImGui_ImplSDL3_ProcessEvent(&event);
             running = event.type != SDL_EVENT_QUIT && event.type != SDL_EVENT_WINDOW_CLOSE_REQUESTED;
@@ -68,13 +68,13 @@ int main()
         if (ImGui::Button("Exit"))
             break;
 
-        if (ImGui::Button(fullscreen ? "Fullscreen (F11): enabled" : "Fullscreen (F11): disabled"))
-            SDL_SetWindowFullscreen(window, fullscreen = !fullscreen);
+        if (ImGui::Button(fullscreen ? "Fullscreen (F11): On" : "Fullscreen (F11): Off"))
+            SDL_SetWindowFullscreen(window, !fullscreen);
 
         ImGui::Text("Pico W connection status:");
         ImGui::SameLine();
         auto[message, color, _]{portalEmulator.getConnectionStatus()};
-        ImGui::TextColored(color, "%s", message.data());
+        ImGui::TextColored(color, " %s", message.data());
 
         SDL_Rect displayBounds;
         SDL_GetDisplayBounds(SDL_GetDisplayForWindow(window), &displayBounds);
