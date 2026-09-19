@@ -109,11 +109,11 @@ void Playable::render(ImDrawList* const drawList, bool disabled)
 
     const int buttonState{disabled ? ButtonState::DISABLED : m_buttonHovered ? ButtonState::HOVERED : ButtonState::NOT_HOVERED};
     const ImU32 color{SKYLANDER_BUTTON_COLORS[computeState()][buttonState]};
-    constexpr double VELOCITY{200.0};
-    constexpr double MIN_DELTA_Y{-20.0};
     constexpr double MAX_DELTA_Y{};
+    const double velocity{m_buttonBounds.GetWidth() * 0.6};
+    const double minDeltaY{m_buttonBounds.GetWidth() * -0.075};
 
-    m_buttonDeltaY = std::clamp(m_buttonDeltaY + (m_buttonHovered ? -VELOCITY : VELOCITY) * ImGui::GetIO().DeltaTime, MIN_DELTA_Y, MAX_DELTA_Y);
+    m_buttonDeltaY = std::clamp(m_buttonDeltaY + (m_buttonHovered ? -velocity : velocity) * ImGui::GetIO().DeltaTime, minDeltaY, MAX_DELTA_Y);
 
     auto buttonBounds{m_buttonBounds};
     auto iconBounds{m_buttonIconBounds};
