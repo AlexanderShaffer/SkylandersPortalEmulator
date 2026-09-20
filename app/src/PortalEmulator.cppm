@@ -51,7 +51,7 @@ public:
     PortalEmulator& operator=(PortalEmulator&&) = delete;
 
     [[nodiscard]] std::shared_ptr<PortalSlot> linkPortalSlot(const std::filesystem::path& figureDumpPath);
-    [[nodiscard]] bool requestUnload(const std::shared_ptr<PortalSlot>& portalSlot);
+    bool requestUnload(const std::shared_ptr<PortalSlot>& portalSlot);
     [[nodiscard]] ConnectionStatus getConnectionStatus();
 
 private:
@@ -59,6 +59,7 @@ private:
     void scanForPico(const std::stop_token& token);
     void validatePico();
     void disconnectFromPico(const std::stop_token& token, std::string_view message);
+    void unloadAllPortalSlots();
     void connectToPico(const std::stop_token& token);
     void runBluetoothThread(const std::stop_token& token);
     [[nodiscard]] bool requestPlayableHalfLoad(const std::shared_ptr<PortalSlot>& portalSlot, PacketType packetType, const std::stop_token& token);
@@ -92,5 +93,5 @@ private:
     std::atomic<std::chrono::time_point<std::chrono::system_clock>> m_timeDuringLastMusicReceived{};
     SDL_AudioStream* m_audioStream{};
 
-    std::jthread m_networkThread{std::bind_front(&PortalEmulator::runBluetoothThread, this)};
+    std::jthread m_bluetoothThread{std::bind_front(&PortalEmulator::runBluetoothThread, this)};
 };

@@ -212,10 +212,20 @@ void PortalEmulator::disconnectFromPico(const std::stop_token& token, const std:
     m_musicCharacteristic = {};
 }
 
+void PortalEmulator::unloadAllPortalSlots()
+{
+    for (std::shared_ptr<PortalSlot>& portalSlot : m_portalSlots)
+        if (portalSlot)
+            requestUnload(portalSlot);
+
+    std::unique_lock lock{m_mutex};
+    m_writeCondition.wait(lock, [this]{return m_writeRequests.empty() || m_disconnectionGate.isOpen();});
+}
+
 void PortalEmulator::connectToPico(const std::stop_token& token)
 {
     m_disconnectionGate.closeIfNotAlready();
-    m_pico.set_callback_on_disconnected([this]{m_disconnectionGate.openIfNotAlready();});
+    m_pico.set_callback_on_disconnected([this]{m_disconnectionGate.openIfNotAlready(); m_writeCondition.notify_all();});
     setConnectionStatus({.Message = "Connecting...", .Color = {0.75f, 1.0f, 0.0f, 1.0f}});
     m_pico.connect();
     validatePico();
@@ -231,9 +241,12 @@ void PortalEmulator::connectToPico(const std::stop_token& token)
     std::jthread writeRequester{std::bind_front(&PortalEmulator::runWriteRequester, this)};
     std::jthread queuedAudioBytesSender{std::bind_front(&PortalEmulator::runQueuedAudioBytesSender, this)};
 
-    setConnectionStatus({.Message = "Connected", .Color = {0.0f, 1.0f, 0.0f, 1.0f}, .Connected = true});
     m_disconnectionGate.enterThroughAsSoonAsPossible(token);
     m_pico.unsubscribe(m_service.uuid(), m_musicCharacteristic.uuid());
+
+    if (token.stop_requested())
+        unloadAllPortalSlots();
+
     m_pico.unsubscribe(m_service.uuid(), m_requestCharacteristic.uuid());
 }
 
@@ -494,8 +507,11 @@ void PortalEmulator::runWriteRequester(const std::stop_token& token)
     if (!validatePortalSlots(token))
     {
         m_disconnectionGate.openIfNotAlready();
+        m_writeCondition.notify_all();
         return;
     }
+
+    setConnectionStatus({.Message = "Connected", .Color = {0.0f, 1.0f, 0.0f, 1.0f}, .Connected = true});
 
     while (!token.stop_requested())
     {
@@ -514,9 +530,11 @@ void PortalEmulator::runWriteRequester(const std::stop_token& token)
             break;
 
         m_indicationGate.enterThroughAsSoonAsPossible(token);
+        m_writeCondition.notify_all();
     }
 
     m_disconnectionGate.openIfNotAlready();
+    m_writeCondition.notify_all();
 }
 
 void PortalEmulator::setConnectionStatus(const ConnectionStatus& connectionStatus)

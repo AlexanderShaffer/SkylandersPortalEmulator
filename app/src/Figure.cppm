@@ -60,7 +60,6 @@ public:
 public:
 
     Playable(std::filesystem::path dumpPath, const std::filesystem::path& iconPath) : m_dumpPath{std::move(dumpPath)}, m_texture{iconPath} {}
-    ~Playable();
 
     void renderTexture(ImDrawList* drawList, ImRect imageBounds, ImU32 color);
     void detachTexture(std::vector<Texture>& destination);
@@ -83,7 +82,7 @@ private:
 
     std::filesystem::path m_dumpPath{};
     Texture m_texture;
-    std::shared_ptr<PortalSlot> m_portalSlot{}; //TODO: Save any open Skylander dumps before the program terminates
+    std::shared_ptr<PortalSlot> m_portalSlot{};
     ImRect m_buttonBounds{}; //TODO: encapsulate button logic in another class
     ImRect m_buttonIconBounds{};
     bool m_buttonHovered{};

@@ -22,12 +22,6 @@ module;
 #include <imgui_internal.h>
 module Figure;
 
-Playable::~Playable()
-{
-    if (m_portalSlot)
-        std::println("A Playable was destroyed while linked to a portal slot");
-}
-
 void Playable::renderTexture(ImDrawList* const drawList, const ImRect imageBounds, const ImU32 color)
 {
     m_texture.render(drawList, imageBounds, color);
