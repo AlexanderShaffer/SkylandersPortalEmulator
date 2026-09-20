@@ -195,10 +195,7 @@ void PortalEmulator::disconnectFromPico(const std::stop_token& token, const std:
         if (m_pico.initialized())
             m_pico.disconnect();
     }
-    catch (const std::exception& e)
-    {
-        std::println(std::cerr, "An exception occurred while disconnecting from the pico: {}", e.what());
-    }
+    catch (const std::exception& /* e */) {}
 
     if (m_pico.initialized())
     {
@@ -267,10 +264,7 @@ void PortalEmulator::runBluetoothThread(const std::stop_token& token)
 
             connectToPico(token);
         }
-        catch (const std::exception& e)
-        {
-            std::println(std::cerr, "An exception occurred in the Bluetooth thread: {}", e.what());
-        }
+        catch (const std::exception& /* e */) {}
     }
 
     disconnectFromPico(token, "Disconnected - Stop requested");
@@ -329,9 +323,8 @@ bool PortalEmulator::writeRequest(const std::span<uint8_t> packet)
         m_pico.write_request(m_service.uuid(), m_requestCharacteristic.uuid(), {packet.data(), packet.size()});
         return true;
     }
-    catch (const std::exception& e)
+    catch (const std::exception& /* e */)
     {
-        std::println(std::cerr, "An exception occurred while performing a write request: {}", e.what());
         return false;
     }
 }
@@ -342,10 +335,7 @@ void PortalEmulator::writeCommand(const std::int32_t data)
     {
         m_pico.write_command(m_service.uuid(), m_musicCharacteristic.uuid(), {reinterpret_cast<const std::uint8_t*>(&data), sizeof(data)});
     }
-    catch (const std::exception& e)
-    {
-        std::println(std::cerr, "An exception occurred while performing a write request: {}", e.what());
-    }
+    catch (const std::exception& /* e */) {}
 }
 
 void PortalEmulator::popWriteRequest()
