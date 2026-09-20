@@ -20,10 +20,7 @@ module;
 #include <simpleble/SimpleBLE.h>
 module PortalSlot;
 
-PortalSlot::PortalSlot(const int index, const std::filesystem::path& figureDumpPath) : m_index{index}, m_skylanderDump{figureDumpPath, std::ios::binary | std::ios::in | std::ios::out}
-{
-    m_skylanderDump.exceptions(std::ios::failbit | std::ios::badbit);
-}
+PortalSlot::PortalSlot(const int index, const std::filesystem::path& figureDumpPath) : m_index{index}, m_skylanderDump{figureDumpPath, std::ios::binary | std::ios::in | std::ios::out} {}
 
 void PortalSlot::readSkylanderDump(const std::size_t offset, const std::span<std::uint8_t> output)
 {

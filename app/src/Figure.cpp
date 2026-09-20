@@ -168,7 +168,7 @@ bool PlayableFigure::find(const uint8_t tick, const SwapperHalf swapperHalf, con
 
 bool PlayableFigure::shouldRemove(const uint8_t tick, std::unique_lock<std::mutex>& uniqueLock, std::vector<Texture>& detachedTextures, int& playablesLoaded)
 {
-    const bool shouldRemove{TickWhenFound != tick};
+    const bool shouldRemove{!isOnPortal() && TickWhenFound != tick};
 
     if (shouldRemove)
     {
@@ -227,7 +227,7 @@ bool Swapper::find(const uint8_t tick, const SwapperHalf swapperHalf, const std:
 
 bool Swapper::shouldRemove(const uint8_t tick, std::unique_lock<std::mutex>& uniqueLock, std::vector<Texture>& detachedTextures, int& playablesLoaded)
 {
-    if (m_bottomHalf && m_bottomHalf->TickWhenFound != tick)
+    if (m_bottomHalf && !m_bottomHalf->isOnPortal() && m_bottomHalf->TickWhenFound != tick)
     {
         playablesLoaded--;
 
@@ -238,7 +238,7 @@ bool Swapper::shouldRemove(const uint8_t tick, std::unique_lock<std::mutex>& uni
         m_bottomHalf.reset();
     }
 
-    if (m_topHalf && m_topHalf->TickWhenFound != tick)
+    if (m_topHalf && !m_topHalf->isOnPortal() && m_topHalf->TickWhenFound != tick)
     {
         playablesLoaded--;
 

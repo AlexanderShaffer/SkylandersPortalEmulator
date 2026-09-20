@@ -184,12 +184,6 @@ void FigureLoader::removeLostFigures(const int playablesFound, const int groupsF
     if (playablesFound == m_playablesLoaded && groupsFound == m_figureGroups.size())
         return;
 
-    if (playablesFound > m_playablesLoaded)
-        std::println("More Playables were found than loaded.");
-
-    if (groupsFound > m_figureGroups.size())
-        std::println("More FigureGroups were found than loaded.");
-
     for (auto groupIt{m_figureGroups.begin()}; groupIt != m_figureGroups.end();)
     {
         auto&[figures, tickWhenFound]{groupIt->second};
@@ -207,14 +201,8 @@ void FigureLoader::removeLostFigures(const int playablesFound, const int groupsF
             ++figureIt;
         }
 
-        if (tickWhenFound != m_tick)
+        if (figures.empty() && tickWhenFound != m_tick)
         {
-            if (!figures.empty())
-            {
-                std::println("Cannot remove a FigureGroup until all of its figures are removed");
-                throw std::runtime_error{""};
-            }
-
             const std::lock_guard lockGuard{m_mutex};
             groupIt = m_figureGroups.erase(groupIt);
             continue;
@@ -222,10 +210,4 @@ void FigureLoader::removeLostFigures(const int playablesFound, const int groupsF
 
         ++groupIt;
     }
-
-    if (playablesFound != m_playablesLoaded)
-        std::println("An error occurred when removing Playables. {} Playables were found, yet {} Playables are loaded.", playablesFound, m_playablesLoaded);
-
-    if (groupsFound != m_figureGroups.size())
-        std::println("An error occurred when removing FigureGroups. {} FigureGroups were found, yet {} FigureGroups are loaded.", groupsFound, m_figureGroups.size());
 }
