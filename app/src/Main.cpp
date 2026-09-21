@@ -91,6 +91,6 @@ int main()
         SDL_RenderPresent(sdlOwner.getRenderer());
     }
 
-    sdlOwner.destroyRendererAndWindow();
+    SDL_HideWindow(sdlOwner.getWindow());
     return 0;
 }
