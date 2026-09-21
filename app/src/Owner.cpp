@@ -1,100 +1,1 @@
-/*
- * This file is part of Skylanders Portal Emulator.
- * Copyright (C) 2026  Alexander Shaffer <alexander.shaffer.623@gmail.com>
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see <https://www.gnu.org/licenses/>.
- */
-
-module;
-#include <SDL3/SDL.h>
-#include <imgui.h>
-#include <stdexcept>
-#include <backends/imgui_impl_sdl3.h>
-#include <backends/imgui_impl_sdlrenderer3.h>
-module Owner;
-
-import Font;
-
-SdlOwner::SdlOwner()
-{
-    if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO))
-        throw std::runtime_error("Failed to initialize SDL");
-
-    SDL_GL_SetAttribute(SDL_GL_CONTEXT_FLAGS, 0);
-    SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
-    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
-    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 0);
-    SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
-    SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24);
-    SDL_GL_SetAttribute(SDL_GL_STENCIL_SIZE, 8);
-
-    constexpr SDL_WindowFlags window_flags{SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIDDEN | SDL_WINDOW_HIGH_PIXEL_DENSITY | SDL_WINDOW_FULLSCREEN};
-
-    m_scale = SDL_GetDisplayContentScale(SDL_GetPrimaryDisplay());
-    m_window = SDL_CreateWindow("Skylanders Portal Emulator", 0.0f, 0.0f, window_flags);
-
-    if (!m_window)
-        throw std::runtime_error("Failed to create SDL_Window");
-
-    m_renderer = SDL_CreateRenderer(m_window, nullptr);
-
-    if (!m_renderer)
-        throw std::runtime_error("Failed to create SDL_Renderer");
-
-    SDL_SetWindowPosition(m_window, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED);
-    SDL_ShowWindow(m_window);
-}
-
-SdlOwner::~SdlOwner()
-{
-    SDL_DestroyRenderer(m_renderer);
-    SDL_DestroyWindow(m_window);
-    SDL_Quit();
-}
-
-ImGuiOwner::ImGuiOwner(const SdlOwner& sdlOwner)
-{
-    IMGUI_CHECKVERSION();
-    ImGui::CreateContext();
-    ImGui_ImplSDL3_InitForSDLRenderer(sdlOwner.getWindow(), sdlOwner.getRenderer());
-    ImGui_ImplSDLRenderer3_Init(sdlOwner.getRenderer());
-
-    auto& io{ImGui::GetIO()};
-
-    io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
-    io.WantSaveIniSettings = false;
-    io.IniFilename = nullptr;
-    io.Fonts->AddFontFromMemoryCompressedTTF(FONT_COMPRESSED_DATA, sizeof(FONT_COMPRESSED_DATA), 50.0f);
-
-    ImGui::StyleColorsDark();
-    auto& style{ImGui::GetStyle()};
-
-    style.WindowRounding = 0.0f;
-    style.Colors[ImGuiCol_WindowBg] = {0.06f, 0.06f, 0.06f, 1.0f};
-    style.Colors[ImGuiCol_Border] = style.Colors[ImGuiCol_WindowBg];
-    style.Colors[ImGuiCol_Separator] = {1.0f, 0.5f, 0.0f, 1.0f};
-    style.SeparatorTextBorderSize = 10.0f;
-    style.SeparatorTextPadding.y = 15.0f;
-    style.ItemSpacing = {5.0f, 5.0f};
-    style.WindowPadding = style.ItemSpacing;
-    style.ScaleAllSizes(sdlOwner.getScale());
-    style.FontScaleDpi = sdlOwner.getScale();
-}
-
-ImGuiOwner::~ImGuiOwner()
-{
-    ImGui_ImplSDLRenderer3_Shutdown();
-    ImGui_ImplSDL3_Shutdown();
-    ImGui::DestroyContext();
-}
+/* * This file is part of Skylanders Portal Emulator. * Copyright (C) 2026  Alexander Shaffer <alexander.shaffer.623@gmail.com> * * This program is free software: you can redistribute it and/or modify * it under the terms of the GNU General Public License as published by * the Free Software Foundation, either version 3 of the License, or * (at your option) any later version. * * This program is distributed in the hope that it will be useful, * but WITHOUT ANY WARRANTY; without even the implied warranty of * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the * GNU General Public License for more details. * * You should have received a copy of the GNU General Public License * along with this program.  If not, see <https://www.gnu.org/licenses/>. */module;#include <SDL3/SDL.h>#include <imgui.h>#include <stdexcept>#include <backends/imgui_impl_sdl3.h>#include <backends/imgui_impl_sdlrenderer3.h>module Owner;import Font;SdlOwner::SdlOwner(){    if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO))        throw std::runtime_error("Failed to initialize SDL");    SDL_GL_SetAttribute(SDL_GL_CONTEXT_FLAGS, 0);    SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 0);    SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);    SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24);    SDL_GL_SetAttribute(SDL_GL_STENCIL_SIZE, 8);    constexpr SDL_WindowFlags window_flags{SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIDDEN | SDL_WINDOW_HIGH_PIXEL_DENSITY | SDL_WINDOW_FULLSCREEN};    SDL_Rect displayBounds{.x = 0, .y = 0, .w = 0, .h = 0};        SDL_GetDisplayBounds(SDL_GetPrimaryDisplay(), &displayBounds);    m_scale = SDL_GetDisplayContentScale(SDL_GetPrimaryDisplay());    m_window = SDL_CreateWindow("Skylanders Portal Emulator", displayBounds.w / 2.0f, displayBounds.h / 2.0f, window_flags);    if (!m_window)        throw std::runtime_error("Failed to create SDL_Window");    m_renderer = SDL_CreateRenderer(m_window, nullptr);    if (!m_renderer)        throw std::runtime_error("Failed to create SDL_Renderer");    SDL_SetWindowPosition(m_window, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED);    SDL_ShowWindow(m_window);}SdlOwner::~SdlOwner(){    SDL_DestroyRenderer(m_renderer);    SDL_DestroyWindow(m_window);    SDL_Quit();}ImGuiOwner::ImGuiOwner(const SdlOwner& sdlOwner){    IMGUI_CHECKVERSION();    ImGui::CreateContext();    ImGui_ImplSDL3_InitForSDLRenderer(sdlOwner.getWindow(), sdlOwner.getRenderer());    ImGui_ImplSDLRenderer3_Init(sdlOwner.getRenderer());    auto& io{ImGui::GetIO()};    io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;    io.WantSaveIniSettings = false;    io.IniFilename = nullptr;    io.Fonts->AddFontFromMemoryCompressedTTF(FONT_COMPRESSED_DATA, sizeof(FONT_COMPRESSED_DATA), 50.0f);    ImGui::StyleColorsDark();    auto& style{ImGui::GetStyle()};    style.WindowRounding = 0.0f;    style.Colors[ImGuiCol_WindowBg] = {0.06f, 0.06f, 0.06f, 1.0f};    style.Colors[ImGuiCol_Border] = style.Colors[ImGuiCol_WindowBg];    style.Colors[ImGuiCol_Separator] = {1.0f, 0.5f, 0.0f, 1.0f};    style.SeparatorTextBorderSize = 10.0f;    style.SeparatorTextPadding.y = 15.0f;    style.ItemSpacing = {5.0f, 5.0f};    style.WindowPadding = style.ItemSpacing;    style.ScaleAllSizes(sdlOwner.getScale());    style.FontScaleDpi = sdlOwner.getScale();}ImGuiOwner::~ImGuiOwner(){    ImGui_ImplSDLRenderer3_Shutdown();    ImGui_ImplSDL3_Shutdown();    ImGui::DestroyContext();}

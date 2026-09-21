@@ -66,7 +66,7 @@ target_compile_options(ImGui PUBLIC
   -DIMGUI_DISABLE_DEFAULT_FONT
 )
 
-target_include_directories(ImGui PUBLIC ${imgui_SOURCE_DIR})
+target_include_directories(ImGui PUBLIC ${imgui_SOURCE_DIR} ${sdl_SOURCE_DIR}/include)
 add_executable(SkylandersPortalEmulator WIN32)
 
 target_sources(SkylandersPortalEmulator
@@ -93,3 +93,7 @@ target_sources(SkylandersPortalEmulator
 
 target_link_libraries(SkylandersPortalEmulator PRIVATE ImGui SDL3::SDL3 simpleble::simpleble)
 target_include_directories(SkylandersPortalEmulator PRIVATE ../common/ ${stb_SOURCE_DIR})
+
+if(MSVC)
+  target_link_options(SkylandersPortalEmulator PRIVATE "/ENTRY:mainCRTStartup")
+endif()
