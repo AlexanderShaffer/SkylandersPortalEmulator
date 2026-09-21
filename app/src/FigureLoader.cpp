@@ -93,23 +93,20 @@ int FigureLoader::searchForPlayables(const std::filesystem::path& directory, Fig
     if (!std::filesystem::is_directory(dumpsDirectory) || !std::filesystem::is_directory(iconsDirectory))
         return figuresFound;
 
+    std::unordered_map<std::string, std::filesystem::path> iconPaths{};
+
+    for (const auto& icon : std::filesystem::directory_iterator{iconsDirectory})
+        iconPaths.emplace(icon.path().stem(), icon.path());
+
     for (const auto& dump : std::filesystem::directory_iterator{dumpsDirectory})
     {
-        const auto& dumpPath{dump.path()};
-        constexpr std::string_view DUMP_EXTENSION{".dump"};
+        const std::string name{dump.path().stem()};
+        const auto it{iconPaths.find(name)};
 
-        if (dumpPath.extension() != DUMP_EXTENSION)
+        if (it == iconPaths.end())
             continue;
 
-        const auto dumpName{dumpPath.filename().string()};
-        const std::string_view name{dumpName.begin(), dumpName.end() - DUMP_EXTENSION.size()};
-        constexpr auto IMAGE_EXTENSION{".jpg"};
-        const auto iconPath{iconsDirectory / name += IMAGE_EXTENSION};
-
-        if (!std::filesystem::exists(iconPath))
-            continue;
-
-        loadPlayable(figures, swapperHalf, dumpPath, iconPath, name);
+        loadPlayable(figures, swapperHalf, dump.path(), it->second, name);
         figuresFound++;
     }
 
