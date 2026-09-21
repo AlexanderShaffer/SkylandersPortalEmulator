@@ -17,10 +17,15 @@
  */
 
 module;
+#include <filesystem>
+#include <memory>
+#include <flat_map>
+#include <mutex>
+#include <stop_token>
+#include <thread>
 #include <SDL3/SDL.h>
 export module FigureLoader;
 
-import std;
 import Figure;
 import PortalEmulator;
 import Texture;

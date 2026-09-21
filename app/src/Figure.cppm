@@ -17,12 +17,13 @@
  */
 
 module;
+#include <filesystem>
 #include <imgui.h>
 #include <imgui_internal.h>
+#include <mutex>
 #include <SDL3/SDL.h>
 export module Figure;
 
-import std;
 import Texture;
 import PortalEmulator;
 import PortalSlot;

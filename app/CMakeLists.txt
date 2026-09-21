@@ -18,7 +18,6 @@ cmake_minimum_required(VERSION 4.4.3)
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
-set(CMAKE_EXPERIMENTAL_CXX_IMPORT_STD f35a9ac6-8463-4d38-8eec-5d6008153e7d)
 
 project(SkylandersPortalEmulator)
 include(FetchContent)
@@ -68,8 +67,6 @@ target_compile_options(ImGui PUBLIC
 )
 
 target_include_directories(ImGui PUBLIC ${imgui_SOURCE_DIR})
-
-set(CMAKE_CXX_MODULE_STD ON)
 add_executable(SkylandersPortalEmulator WIN32)
 
 target_sources(SkylandersPortalEmulator

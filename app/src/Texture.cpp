@@ -21,6 +21,8 @@ module;
 #include <imgui.h>
 #include <imgui_internal.h>
 #include <SDL3/SDL.h>
+#include <variant>
+#include <filesystem>
 module Texture;
 
 Texture::ImageState::~ImageState()

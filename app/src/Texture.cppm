@@ -18,13 +18,13 @@
 
 module;
 #define STB_IMAGE_IMPLEMENTATION
+#include <filesystem>
 #include <stb_image.h>
 #include <imgui.h>
 #include <imgui_internal.h>
+#include <variant>
 #include <SDL3/SDL.h>
 export module Texture;
-
-import std;
 
 export class Texture
 {

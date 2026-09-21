@@ -20,8 +20,6 @@ module;
 #include <SDL3/SDL.h>
 export module Owner;
 
-import std;
-
 export class SdlOwner
 {
 public:

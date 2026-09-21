@@ -18,15 +18,19 @@
 
 module;
 #include <Common.hpp>
+#include <condition_variable>
+#include <filesystem>
 #include <SDL3/SDL.h>
 #include <imgui.h>
+#include <queue>
+#include <stop_token>
 #include <simpleble/SimpleBLE.h>
+#include <thread>
 export module PortalEmulator;
 
 import PortalSlot;
 import Owner;
 import Gate;
-import std;
 
 export class PortalEmulator
 {

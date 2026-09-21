@@ -20,7 +20,11 @@ module;
 #include <Common.hpp>
 #include <imgui.h>
 #include <imgui_internal.h>
+#include <vector>
 #include <SDL3/SDL.h>
+#include <algorithm>
+#include <filesystem>
+#include <mutex>
 module Figure;
 
 void Playable::renderTexture(ImDrawList* const drawList, SDL_Renderer* const renderer, const ImRect imageBounds, const ImU32 color)

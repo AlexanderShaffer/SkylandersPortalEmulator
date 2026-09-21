@@ -17,7 +17,11 @@
  */
 
 module;
+#include <condition_variable>
+#include <filesystem>
 #include <imgui_internal.h>
+#include <mutex>
+#include <unordered_map>
 #include <SDL3/SDL.h>
 module FigureLoader;
 
@@ -96,11 +100,11 @@ int FigureLoader::searchForPlayables(const std::filesystem::path& directory, Fig
     std::unordered_map<std::string, std::filesystem::path> iconPaths{};
 
     for (const auto& icon : std::filesystem::directory_iterator{iconsDirectory})
-        iconPaths.emplace(icon.path().stem(), icon.path());
+        iconPaths.emplace(icon.path().stem().string(), icon.path());
 
     for (const auto& dump : std::filesystem::directory_iterator{dumpsDirectory})
     {
-        const std::string name{dump.path().stem()};
+        const std::string name{dump.path().stem().string()};
         const auto it{iconPaths.find(name)};
 
         if (it == iconPaths.end())

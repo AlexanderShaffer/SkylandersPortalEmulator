@@ -16,6 +16,9 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+module;
+#include <mutex>
+#include <stop_token>
 module Gate;
 
 void Gate::openIfNotAlready()

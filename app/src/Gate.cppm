@@ -16,9 +16,11 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+module;
+#include <condition_variable>
+#include <mutex>
+#include <stop_token>
 export module Gate;
-
-import std;
 
 export class Gate
 {

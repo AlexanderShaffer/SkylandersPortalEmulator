@@ -17,11 +17,12 @@
  */
 
 module;
+#include <atomic>
 #include <Common.hpp>
+#include <filesystem>
+#include <fstream>
 #include <simpleble/SimpleBLE.h>
 export module PortalSlot;
-
-import std;
 
 export class PortalSlot
 {

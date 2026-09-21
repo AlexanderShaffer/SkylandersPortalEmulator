@@ -18,6 +18,7 @@
 
 module;
 #include <simpleble/SimpleBLE.h>
+#include <filesystem>
 module PortalSlot;
 
 PortalSlot::PortalSlot(const int index, const std::filesystem::path& figureDumpPath) : m_index{index}, m_skylanderDump{figureDumpPath, std::ios::binary | std::ios::in | std::ios::out}, m_dumpStreamGood{m_skylanderDump.good()} {}

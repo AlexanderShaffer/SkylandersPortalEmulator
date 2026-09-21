@@ -20,6 +20,10 @@ module;
 #include <simpleble/SimpleBLE.h>
 #include <Common.hpp>
 #include <SDL3/SDL.h>
+#include <filesystem>
+#include <mutex>
+#include <thread>
+#include <condition_variable>
 module PortalEmulator;
 
 PortalEmulator::PortalEmulator()
