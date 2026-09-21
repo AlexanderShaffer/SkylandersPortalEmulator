@@ -55,6 +55,7 @@ public:
         OFF_PORTAL,
         ON_PORTAL,
         RESTING,
+        IO_ERROR,
         COUNT
     };
 

@@ -93,6 +93,10 @@ using SkylanderButtonColors = std::array<std::array<ImU32, ButtonState::COUNT>, 
     colors[Playable::State::RESTING][HOVERED] = 0xFF6666FF;
     colors[Playable::State::RESTING][DISABLED] = 0xFF111155;
 
+    colors[Playable::State::IO_ERROR][NOT_HOVERED] = 0xFFCC0000;
+    colors[Playable::State::IO_ERROR][HOVERED] = 0xFFFF3333;
+    colors[Playable::State::IO_ERROR][DISABLED] = 0xFF550000;
+
     return colors;
 }
 
@@ -103,7 +107,7 @@ void Playable::render(ImDrawList* const drawList, SDL_Renderer* const renderer, 
     disabled = disabled || (m_portalSlot && m_portalSlot->getState() != PortalSlotState::LOADED);
 
     const int buttonState{disabled ? ButtonState::DISABLED : m_buttonHovered ? ButtonState::HOVERED : ButtonState::NOT_HOVERED};
-    const ImU32 color{SKYLANDER_BUTTON_COLORS[computeState()][buttonState]};
+    const ImU32 color{SKYLANDER_BUTTON_COLORS[!m_portalSlot || m_portalSlot->isDumpStreamGood() ? computeState() : Playable::State::IO_ERROR][buttonState]};
     constexpr double MAX_DELTA_Y{};
     const double velocity{m_buttonBounds.GetWidth() * 0.6};
     const double minDeltaY{m_buttonBounds.GetWidth() * -0.075};

@@ -20,16 +20,18 @@ module;
 #include <simpleble/SimpleBLE.h>
 module PortalSlot;
 
-PortalSlot::PortalSlot(const int index, const std::filesystem::path& figureDumpPath) : m_index{index}, m_skylanderDump{figureDumpPath, std::ios::binary | std::ios::in | std::ios::out} {}
+PortalSlot::PortalSlot(const int index, const std::filesystem::path& figureDumpPath) : m_index{index}, m_skylanderDump{figureDumpPath, std::ios::binary | std::ios::in | std::ios::out}, m_dumpStreamGood{m_skylanderDump.good()} {}
 
 void PortalSlot::readSkylanderDump(const std::size_t offset, const std::span<std::uint8_t> output)
 {
     m_skylanderDump.seekg(offset);
     m_skylanderDump.read(reinterpret_cast<char*>(output.data()), output.size());
+    m_dumpStreamGood = m_skylanderDump.good();
 }
 
 void PortalSlot::writeSkylanderDump(const std::span<std::uint8_t> input)
 {
     m_skylanderDump.seekg(std::ios::beg);
     m_skylanderDump.write(reinterpret_cast<const char*>(input.data()), input.size());
+    m_dumpStreamGood = m_skylanderDump.good();
 }
