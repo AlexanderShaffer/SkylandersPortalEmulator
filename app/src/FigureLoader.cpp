@@ -18,9 +18,10 @@
 
 module;
 #include <imgui_internal.h>
+#include <SDL3/SDL.h>
 module FigureLoader;
 
-void FigureLoader::renderSkylanderButtons(PortalEmulator& portalEmulator)
+void FigureLoader::renderSkylanderButtons(PortalEmulator& portalEmulator, SDL_Renderer* const renderer)
 {
     constexpr int SKYLANDERS_PER_ROW{6};
     const ImVec2 padding{ImGui::GetStyle().ItemSpacing * 2.0f};
@@ -63,7 +64,7 @@ void FigureLoader::renderSkylanderButtons(PortalEmulator& portalEmulator)
 
     for (const auto& group : m_figureGroups.values())
         for (auto& figure : group.Figures.values())
-            figure->render(drawList, disableSwapperBottoms, disableSwapperTops, connected);
+            figure->render(drawList, renderer, disableSwapperBottoms, disableSwapperTops, connected);
 }
 
 void FigureLoader::run(const std::stop_token& token)

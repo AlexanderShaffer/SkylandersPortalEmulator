@@ -17,10 +17,10 @@
  */
 
 module;
-#include <backends/imgui_impl_opengl3_loader.h>
 #include <stb_image.h>
 #include <imgui.h>
 #include <imgui_internal.h>
+#include <SDL3/SDL.h>
 module Texture;
 
 Texture::ImageState::~ImageState()
@@ -38,25 +38,28 @@ auto Texture::ImageState::operator=(ImageState&& other) noexcept -> ImageState&
     if (this == &other)
         return *this;
 
-    stbi_image_free(m_ptr);
-    m_ptr = nullptr;
     std::swap(m_ptr, other.m_ptr);
     return *this;
 }
 
-Texture::LoadedState::LoadedState(const ImageState& image, const ImVec2 size)
+Texture::LoadedState::LoadedState(const ImageState& image, const ImVec2 size, SDL_Renderer* const renderer)
 {
-    glGenTextures(1, &m_id);
-    glBindTexture(GL_TEXTURE_2D, m_id);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, size.x, size.y, 0, GL_RGBA, GL_UNSIGNED_BYTE, image.getPtr());
-    glBindTexture(GL_TEXTURE_2D, NO_TEXTURE);
+    if (!image.getPtr())
+        return;
+
+    static constexpr int CHANNELS{4};
+    SDL_Surface* const surface{SDL_CreateSurfaceFrom(size.x, size.y, SDL_PIXELFORMAT_RGBA32, image.getPtr(), CHANNELS * size.x)};
+
+    if (!surface)
+        return;
+
+    m_texture = SDL_CreateTextureFromSurface(renderer, surface);
+    SDL_DestroySurface(surface);
 }
 
 Texture::LoadedState::~LoadedState()
 {
-    glDeleteTextures(1, &m_id);
+    SDL_DestroyTexture(m_texture);
 }
 
 Texture::LoadedState::LoadedState(LoadedState&& other) noexcept
@@ -69,33 +72,32 @@ auto Texture::LoadedState::operator=(LoadedState&& other) noexcept -> LoadedStat
     if (this == &other)
         return *this;
 
-    glDeleteTextures(1, &m_id);
-    m_id = NO_TEXTURE;
-    std::swap(m_id, other.m_id);
+    std::swap(m_texture, other.m_texture);
     return *this;
 }
 
 Texture::Texture(const std::filesystem::path& imagePath)
 {
-    int width, height;
+    int width{766};
+    int height{1205};
     stbi_uc* const image{stbi_load(imagePath.string().c_str(), &width, &height, nullptr, STBI_rgb_alpha)};
-
-    if (!image)
-        throw std::runtime_error{"Failed to read an image from a file"};
 
     m_state.emplace<ImageState>(image);
     m_size = {static_cast<float>(width), static_cast<float>(height)};
 }
 
-void Texture::render(ImDrawList* const drawList, const ImRect imageBounds, const ImU32 color)
+void Texture::render(ImDrawList* const drawList, SDL_Renderer* const renderer, const ImRect imageBounds, const ImU32 color)
 {
     constexpr ImVec2 UV_MIN{0.0f, 0.0f};
     constexpr ImVec2 UV_MAX{1.0f, 1.0f};
 
     if (!isLoaded())
-        load();
+        load(renderer);
 
-    drawList->AddImage(std::get<LoadedState>(m_state).getId(), imageBounds.Min, imageBounds.Max, UV_MIN, UV_MAX, color);
+    if (SDL_Texture* const texture{std::get<LoadedState>(m_state).getTexture()}; texture)
+        drawList->AddImage(texture, imageBounds.Min, imageBounds.Max, UV_MIN, UV_MAX, color);
+    else
+        drawList->AddRectFilled(imageBounds.Min, imageBounds.Max, color);
 }
 
 bool Texture::isLoaded() const
@@ -108,8 +110,8 @@ bool Texture::isLoaded() const
     return m_size;
 }
 
-void Texture::load()
+void Texture::load(SDL_Renderer* const renderer)
 {
     auto image{std::get<ImageState>(std::move(m_state))};
-    m_state.emplace<LoadedState>(image, m_size);
+    m_state.emplace<LoadedState>(image, m_size, renderer);
 }

@@ -20,11 +20,12 @@ module;
 #include <Common.hpp>
 #include <imgui.h>
 #include <imgui_internal.h>
+#include <SDL3/SDL.h>
 module Figure;
 
-void Playable::renderTexture(ImDrawList* const drawList, const ImRect imageBounds, const ImU32 color)
+void Playable::renderTexture(ImDrawList* const drawList, SDL_Renderer* const renderer, const ImRect imageBounds, const ImU32 color)
 {
-    m_texture.render(drawList, imageBounds, color);
+    m_texture.render(drawList, renderer, imageBounds, color);
 }
 
 void Playable::detachTexture(std::vector<Texture>& destination)
@@ -97,7 +98,7 @@ using SkylanderButtonColors = std::array<std::array<ImU32, ButtonState::COUNT>, 
 
 SkylanderButtonColors SKYLANDER_BUTTON_COLORS{createSkylanderButtonColors()};
 
-void Playable::render(ImDrawList* const drawList, bool disabled)
+void Playable::render(ImDrawList* const drawList, SDL_Renderer* const renderer, bool disabled)
 {
     disabled = disabled || (m_portalSlot && m_portalSlot->getState() != PortalSlotState::LOADED);
 
@@ -116,7 +117,7 @@ void Playable::render(ImDrawList* const drawList, bool disabled)
     buttonBounds.TranslateY(m_buttonDeltaY);
 
     drawList->AddRectFilled(buttonBounds.Min, buttonBounds.Max, color);
-    renderTexture(drawList, iconBounds, color);
+    renderTexture(drawList, renderer, iconBounds, color);
     m_buttonDisabled = disabled;
 }
 
@@ -192,9 +193,9 @@ void PlayableFigure::update(int& index, const ImVec2 pos, const float imageWidth
     index++;
 }
 
-void PlayableFigure::render(ImDrawList* const drawList, const bool disableSwapperBottoms, const bool disableSwapperTops, const bool connectedToInterface)
+void PlayableFigure::render(ImDrawList* const drawList, SDL_Renderer* const renderer, const bool disableSwapperBottoms, const bool disableSwapperTops, const bool connectedToInterface)
 {
-    Playable::render(drawList, disableSwapperBottoms || disableSwapperTops || !connectedToInterface);
+    Playable::render(drawList, renderer, disableSwapperBottoms || disableSwapperTops || !connectedToInterface);
 }
 
 bool Swapper::find(const uint8_t tick, const SwapperHalf swapperHalf, const std::filesystem::path& dumpPath, const std::filesystem::path& iconPath)
@@ -286,19 +287,19 @@ void Swapper::update(int& index, ImVec2 pos, const float imageWidth, int& swappe
     ImGui::ItemAdd(bounds, index);
 }
 
-void Swapper::render(ImDrawList* const drawList, const bool disableSwapperBottoms, const bool disableSwapperTops, const bool connectedToInterface)
+void Swapper::render(ImDrawList* const drawList, SDL_Renderer* const renderer, const bool disableSwapperBottoms, const bool disableSwapperTops, const bool connectedToInterface)
 {
     if (m_topHalf)
     {
         const bool topHalfOnPortal{m_topHalf->isOnPortal()};
         const bool disableTopHalf{(topHalfOnPortal && disableSwapperBottoms) || (!topHalfOnPortal && disableSwapperTops)};
-        m_topHalf->render(drawList, disableTopHalf || !connectedToInterface);
+        m_topHalf->render(drawList, renderer, disableTopHalf || !connectedToInterface);
     }
 
     if (m_bottomHalf)
     {
         const bool bottomHalfOnPortal{m_bottomHalf->isOnPortal()};
         const bool disableBottomHalf{(bottomHalfOnPortal && disableSwapperTops) || (!bottomHalfOnPortal && disableSwapperBottoms)};
-        m_bottomHalf->render(drawList, disableBottomHalf || !connectedToInterface);
+        m_bottomHalf->render(drawList, renderer, disableBottomHalf || !connectedToInterface);
     }
 }

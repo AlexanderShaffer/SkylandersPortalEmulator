@@ -16,6 +16,8 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+module;
+#include <SDL3/SDL.h>
 export module FigureLoader;
 
 import std;
@@ -38,7 +40,7 @@ private:
 
 public:
 
-    void renderSkylanderButtons(PortalEmulator& portalEmulator);
+    void renderSkylanderButtons(PortalEmulator& portalEmulator, SDL_Renderer* renderer);
 
 private:
 

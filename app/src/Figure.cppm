@@ -19,6 +19,7 @@
 module;
 #include <imgui.h>
 #include <imgui_internal.h>
+#include <SDL3/SDL.h>
 export module Figure;
 
 import std;
@@ -42,7 +43,7 @@ public:
     [[nodiscard]] virtual bool find(std::uint8_t tick, SwapperHalf swapperHalf, const std::filesystem::path& dumpPath, const std::filesystem::path& iconPath) = 0;
     [[nodiscard]] virtual bool shouldRemove(std::uint8_t tick, std::unique_lock<std::mutex>& uniqueLock, std::vector<Texture>& detachedTextures, int& playablesLoaded) = 0;
     virtual void update(int& index, ImVec2 pos, float imageWidth, int& swapperBottomsOnPortal, int& swapperTopsOnPortal, ImVec2 padding, PortalEmulator& portalEmulator) = 0;
-    virtual void render(ImDrawList* drawList, bool disableSwapperBottoms, bool disableSwapperTops, bool connectedToInterface) = 0;
+    virtual void render(ImDrawList* drawList, SDL_Renderer* renderer, bool disableSwapperBottoms, bool disableSwapperTops, bool connectedToInterface) = 0;
 };
 
 export class Playable
@@ -61,10 +62,10 @@ public:
 
     Playable(std::filesystem::path dumpPath, const std::filesystem::path& iconPath) : m_dumpPath{std::move(dumpPath)}, m_texture{iconPath} {}
 
-    void renderTexture(ImDrawList* drawList, ImRect imageBounds, ImU32 color);
+    void renderTexture(ImDrawList* drawList, SDL_Renderer* renderer, ImRect imageBounds, ImU32 color);
     void detachTexture(std::vector<Texture>& destination);
     [[nodiscard]] ImRect update(int index, ImVec2 pos, float imageWidth, ImVec2 padding, PortalEmulator& portalEmulator);
-    void render(ImDrawList* drawList, bool disabled);
+    void render(ImDrawList* drawList, SDL_Renderer* renderer, bool disabled);
     [[nodiscard]] ImVec2 getTextureSize() const;
     [[nodiscard]] bool isOnPortal() const;
 
@@ -100,7 +101,7 @@ public:
     [[nodiscard]] bool find(std::uint8_t tick, SwapperHalf swapperHalf, const std::filesystem::path& dumpPath, const std::filesystem::path& iconPath) override;
     [[nodiscard]] bool shouldRemove(std::uint8_t tick, std::unique_lock<std::mutex>& uniqueLock, std::vector<Texture>& detachedTextures, int& playablesLoaded) override;
     void update(int& index, ImVec2 pos, float imageWidth, int& swapperBottomsOnPortal, int& swapperTopsOnPortal, ImVec2 padding, PortalEmulator& portalEmulator) override;
-    void render(ImDrawList* drawList, bool disableSwapperBottoms, bool disableSwapperTops, bool connectedToInterface) override;
+    void render(ImDrawList* drawList, SDL_Renderer* renderer, bool disableSwapperBottoms, bool disableSwapperTops, bool connectedToInterface) override;
 };
 
 export class Swapper final : public Figure
@@ -110,7 +111,7 @@ public:
     [[nodiscard]] bool find(std::uint8_t tick, SwapperHalf swapperHalf, const std::filesystem::path& dumpPath, const std::filesystem::path& iconPath) override;
     [[nodiscard]] bool shouldRemove(std::uint8_t tick, std::unique_lock<std::mutex>& uniqueLock, std::vector<Texture>& detachedTextures, int& playablesLoaded) override;
     void update(int& index, ImVec2 pos, float imageWidth, int& swapperBottomsOnPortal, int& swapperTopsOnPortal, ImVec2 padding, PortalEmulator& portalEmulator) override;
-    void render(ImDrawList* drawList, bool disableSwapperBottoms, bool disableSwapperTops, bool connectedToInterface) override;
+    void render(ImDrawList* drawList, SDL_Renderer* renderer, bool disableSwapperBottoms, bool disableSwapperTops, bool connectedToInterface) override;
 
 private:
 

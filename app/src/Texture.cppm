@@ -19,9 +19,9 @@
 module;
 #define STB_IMAGE_IMPLEMENTATION
 #include <stb_image.h>
-#include <backends/imgui_impl_opengl3_loader.h>
 #include <imgui.h>
 #include <imgui_internal.h>
+#include <SDL3/SDL.h>
 export module Texture;
 
 import std;
@@ -45,27 +45,25 @@ private:
 
     private:
 
-        stbi_uc* m_ptr{};
+        stbi_uc* m_ptr{nullptr};
     };
 
     class LoadedState
     {
     public:
 
-        LoadedState(const ImageState& image, ImVec2 size);
+        LoadedState(const ImageState& image, ImVec2 size, SDL_Renderer* renderer);
         ~LoadedState();
         LoadedState(const LoadedState& other) = delete;
         LoadedState(LoadedState&& other) noexcept;
         LoadedState& operator=(const LoadedState& other) = delete;
         LoadedState& operator=(LoadedState&& other) noexcept;
 
-        [[nodiscard]] GLuint getId() const {return m_id;}
+        [[nodiscard]] SDL_Texture* getTexture() const {return m_texture;}
 
     private:
 
-        static constexpr GLuint NO_TEXTURE{};
-
-        GLuint m_id{NO_TEXTURE};
+        SDL_Texture* m_texture{nullptr};
     };
 
 public:
@@ -77,13 +75,13 @@ public:
     Texture& operator=(const Texture&) = delete;
     Texture& operator=(Texture&&) noexcept = default;
 
-    void render(ImDrawList* drawList, ImRect imageBounds, ImU32 color);
+    void render(ImDrawList* drawList, SDL_Renderer* renderer, ImRect imageBounds, ImU32 color);
     [[nodiscard]] bool isLoaded() const;
     [[nodiscard]] ImVec2 getSize() const;
 
 private:
 
-    void load();
+    void load(SDL_Renderer* renderer);
 
 private:
 

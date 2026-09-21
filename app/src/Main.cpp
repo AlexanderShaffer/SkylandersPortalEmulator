@@ -17,9 +17,8 @@
  */
 
 #include <SDL3/SDL.h>
-#include <backends/imgui_impl_opengl3_loader.h>
 #include <backends/imgui_impl_sdl3.h>
-#include <backends/imgui_impl_opengl3.h>
+#include <backends/imgui_impl_sdlrenderer3.h>
 import Owner;
 import PortalEmulator;
 import FigureLoader;
@@ -57,7 +56,7 @@ int main()
             continue;
         }
 
-        ImGui_ImplOpenGL3_NewFrame();
+        ImGui_ImplSDLRenderer3_NewFrame();
         ImGui_ImplSDL3_NewFrame();
         ImGui::NewFrame();
 
@@ -81,17 +80,17 @@ int main()
         ImGui::GetStyle().ItemSpacing = maxItemSpacing * (io.DisplaySize.x / displayBounds.w);
         ImGui::GetStyle().WindowPadding = ImGui::GetStyle().ItemSpacing;
 
-        figureLoader.renderSkylanderButtons(portalEmulator);
+        figureLoader.renderSkylanderButtons(portalEmulator, sdlOwner.getRenderer());
         ImGui::End();
 
         ImGui::Render();
-        glViewport(0, 0, io.DisplaySize.x, io.DisplaySize.y);
-        glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
-        glClear(GL_COLOR_BUFFER_BIT);
-        ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
-        SDL_GL_SwapWindow(window);
+        SDL_SetRenderScale(sdlOwner.getRenderer(), io.DisplayFramebufferScale.x, io.DisplayFramebufferScale.y);
+        SDL_SetRenderDrawColorFloat(sdlOwner.getRenderer(), 0.0f, 0.0f, 0.0f, 1.0f);
+        SDL_RenderClear(sdlOwner.getRenderer());
+        ImGui_ImplSDLRenderer3_RenderDrawData(ImGui::GetDrawData(), sdlOwner.getRenderer());
+        SDL_RenderPresent(sdlOwner.getRenderer());
     }
 
-    sdlOwner.destroyContextAndWindow();
+    sdlOwner.destroyRendererAndWindow();
     return 0;
 }

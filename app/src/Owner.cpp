@@ -20,7 +20,7 @@ module;
 #include <SDL3/SDL.h>
 #include <imgui.h>
 #include <backends/imgui_impl_sdl3.h>
-#include <backends/imgui_impl_opengl3.h>
+#include <backends/imgui_impl_sdlrenderer3.h>
 module Owner;
 
 import Font;
@@ -44,15 +44,13 @@ SdlOwner::SdlOwner()
     m_window = SDL_CreateWindow("Skylanders Portal Emulator", 0.0f, 0.0f, window_flags);
 
     if (!m_window)
-        throw std::runtime_error("Failed to create SDL window");
+        throw std::runtime_error("Failed to create SDL_Window");
 
-    m_glContext = SDL_GL_CreateContext(m_window);
+    m_renderer = SDL_CreateRenderer(m_window, nullptr);
 
-    if (!m_glContext)
-        throw std::runtime_error("Failed to create GL context");
+    if (!m_renderer)
+        throw std::runtime_error("Failed to create SDL_Renderer");
 
-    SDL_GL_MakeCurrent(m_window, m_glContext);
-    SDL_GL_SetSwapInterval(1);
     SDL_SetWindowPosition(m_window, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED);
     SDL_ShowWindow(m_window);
 }
@@ -62,9 +60,9 @@ SdlOwner::~SdlOwner()
     SDL_Quit();
 }
 
-void SdlOwner::destroyContextAndWindow() const
+void SdlOwner::destroyRendererAndWindow() const
 {
-    SDL_GL_DestroyContext(m_glContext);
+    SDL_DestroyRenderer(m_renderer);
     SDL_DestroyWindow(m_window);
 }
 
@@ -72,8 +70,8 @@ ImGuiOwner::ImGuiOwner(const SdlOwner& sdlOwner)
 {
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
-    ImGui_ImplSDL3_InitForOpenGL(sdlOwner.getWindow(), sdlOwner.getGlContext());
-    ImGui_ImplOpenGL3_Init();
+    ImGui_ImplSDL3_InitForSDLRenderer(sdlOwner.getWindow(), sdlOwner.getRenderer());
+    ImGui_ImplSDLRenderer3_Init(sdlOwner.getRenderer());
 
     auto& io{ImGui::GetIO()};
 
@@ -99,7 +97,7 @@ ImGuiOwner::ImGuiOwner(const SdlOwner& sdlOwner)
 
 ImGuiOwner::~ImGuiOwner()
 {
-    ImGui_ImplOpenGL3_Shutdown();
+    ImGui_ImplSDLRenderer3_Shutdown();
     ImGui_ImplSDL3_Shutdown();
     ImGui::DestroyContext();
 }
